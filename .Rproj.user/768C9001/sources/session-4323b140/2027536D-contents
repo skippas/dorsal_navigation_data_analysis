@@ -1,0 +1,119 @@
+bin_fill <- c('1' = '#27b376', '0' = '#bf212f')
+fill_scale <- scale_fill_manual(name = "choice", values = bin_fill, labels = c('sham nest', 'nest'))
+color_scale <- scale_color_manual(name = "first_decision", values = bin_fill)
+grad_scale <- scale_colour_gradient2(low = bin_fill[2], high = bin_fill[1], 
+                         midpoint = 0.5, limit = c(0,1), space = "Lab")
+
+
+library(tidyverse)
+# dorsal canopy navigation
+decisions <- readxl::read_xlsx("data/Spatial_resolution_experiment.xlsx",
+                                 sheet = "dorsal_canopy_exp", na = "NA", n_max = 1000)
+
+# remove trials that are NA for a time of return
+decisions <- decisions %>% filter(!is.na(first_decision), ! is.na(t_ret), ! is.na(nest)) 
+# remove initial training trials and only explore from when testing (alternation) started
+
+# Arrange data by date_time and add trial column
+# first, make a correct date-time column
+decisions$t_ret <- decisions$date + hms(format(decisions$t_ret, "%H:%M:%S"))
+decisions <- decisions %>%
+  arrange(t_ret) %>%
+  mutate(trial = row_number())
+
+# decisions across trials
+p <- ggplot(decisions, aes(x = trial, fill = as.character(first_decision))) +
+  geom_bar(position = "stack")+
+  labs(x = "Trial", y = "Count", fill = "Decision") +
+  theme_minimal(base_size = 25)+
+  theme(axis.text.y=element_blank(), legend.position = 'top')+
+  ylab("")+
+  scale_y_discrete(breaks=NULL)+
+  fill_scale
+ggsave("/Users/andrescheepers/Library/CloudStorage/OneDrive-LundUniversity/PhD/my_phd/images/dorsal_canopy_exp_figures/megalopta/barP_corrDecAcrossTrials.png",
+       plot = p, width = 10, height = 8, dpi = 300)
+
+# how did testing look side to side towards the end / over time?
+p <- decisions %>% 
+  ggplot(aes(x = as.character(side_dpatt_ret),
+             fill = as.character(first_decision)))+
+  geom_bar(position = "stack", width = 0.5)+
+  labs(x = "decision")+
+  theme_gray(base_size = 25)+
+  fill_scale
+# as above but with proportions on y-axis
+p <- decisions %>% 
+  ggplot(aes(x = as.character(side_dpatt_ret),
+             fill = as.character(first_decision)))+
+  geom_bar(position = "fill")+
+  geom_hline(yintercept = 0.5, lty =2)+
+  #geom_text(aes(label = p_value, y = 0.6), size = 8)+ # throws error bc other freq p values not shown
+  labs(x = "Grating spatial frequency", y = "proportion of decisions")+
+  theme_gray(base_size = 25)+
+  fill_scale
+# tile plot
+p <- ggplot(decisions, aes(x = trial, y = rev(side_dpatt_ret), fill = as.character(first_decision))) +
+  geom_tile(color = 'white')+
+  #scale_y_discrete(limits = c('R', 'L'))+
+  theme_minimal(base_size = 25)+
+  fill_scale+
+  coord_flip() 
+
+# last 20 trials vs first 20
+decisions <- decisions %>%
+  mutate(rank = rank(trial)) %>%
+  mutate(category = case_when(
+    rank <= 40 ~ 'first_40',
+    rank > (length(trial) - 20) ~ 'last_20',
+    TRUE ~ 'other'
+  )) %>%
+  select(-rank)
+
+p <- decisions %>% 
+  filter(category != 'other') %>%
+  ggplot(aes(x = as.character(category),
+             fill = as.character(first_decision)))+
+  geom_bar(position = "fill")+
+  geom_hline(yintercept = 0.5, lty =2)+
+  #geom_text(aes(label = p_value, y = 0.6), size = 8)+ # throws error bc other freq p values not shown
+  labs(x = "trial category", y = "proportion of decisions")+
+  theme_minimal(base_size = 25)+
+  fill_scale
+ggsave("/Users/andrescheepers/Library/CloudStorage/OneDrive-LundUniversity/PhD/my_phd/images/dorsal_canopy_exp_figures/megalopta/barP_propCorrFirstVsLastTrials.png",
+       plot = p, width = 10, height = 8, dpi = 300)
+
+# statistics to add to last 20 vs first 40 plot
+# library(binom)
+# succ_fail <- table(decisions$first_decision, decisions$category)
+# ci <- binom.confint(x = succ_fail["1"], n = succ_fail["1"] + succ_fail["0"], 
+#                     methods = "asymptotic")
+# ci[2,4] <- 1 - ci[, "mean"]
+# ci[, "decision"] <- c("Correct", "Incorrect")
+# 
+# props <- prop.table(succ_fail)
+# names(props) <- c("Incorrect", "Correct")
+# props <- tibble(decision = names(props), proportion = props)
+
+# would be nice to plot predicted probability as a function of trial number
+mod1<- glm(as.numeric(first_decision) ~ trial,
+           data = decisions, family = binomial)
+summary(mod1)
+
+# code adapted from wasp dorsal pattern analysis
+decisions$pred_prob <- predict(mod1, type = "response")
+
+p <- ggplot(decisions, aes(x = trial, y = pred_prob))+
+  # stat_smooth(method = "glm", method.args = list(family = "binomial"), 
+  #             aes(color = ..y..))+
+  geom_smooth(method = "glm", method.args = list(family = binomial),
+              fill = "grey", colour = "black", alpha = 0.5) +
+  geom_hline(yintercept = 0.5, lty = 2)+
+  labs(x = "Trial", y = "Predicted Probability")+
+  geom_jitter(aes(x = trial, y = first_decision,
+                  color = first_decision), size = 3, width = 0.1, height = 0.02)+
+  grad_scale+
+  theme_minimal(base_size = 25)+
+  theme(legend.position =  'none')
+ggsave("/Users/andrescheepers/Library/CloudStorage/OneDrive-LundUniversity/PhD/my_phd/images/dorsal_canopy_exp_figures/megalopta/logRegPlot_probCorrAcrossTrials.png",
+       plot = p, width = 10, height = 8, dpi = 300)
+

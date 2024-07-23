@@ -1,0 +1,1027 @@
+---
+title: "data_analysis_2023"
+author: "drdre"
+date: '2023-08-17'
+output: html_document
+---
+
+Data analysis 2023
+
+```{r}
+rm(list = ls())
+source("loading_cleaning.R")
+
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+bin_fill <- c('1' = '#27b376', '0' = '#bf212f')
+fill_scale <- scale_fill_manual(name = "first", values = bin_fill)
+color_scale <- scale_color_manual(name = "first_decision", values = bin_fill)
+grad_scale <- scale_colour_gradient2(low = bin_fill[2], high = bin_fill[1], 
+                         midpoint = 0.5, limit = c(0,1), space = "Lab")
+
+theme_set(theme_minimal())
+
+custom_theme_no_y_grid <- theme_minimal() +
+  theme(
+    panel.grid.major.y = element_blank(),  # Remove major horizontal grid lines
+    panel.grid.minor.y = element_blank(),  # Remove minor horizontal grid lines
+   )
+custom_theme_no_x_grid <- theme_minimal() +
+  theme(
+    panel.grid.major.x = element_blank(),  # Remove major horizontal grid lines
+    panel.grid.minor.x = element_blank(),  # Remove minor horizontal grid lines
+   )
+custom_theme_text_enlarged <- theme_classic()+
+  theme(
+        axis.title.y = element_text(size = 30, face = "bold"),
+        axis.title.x = element_text(size = 30, face = "bold"),
+        axis.text.x = element_text(size = 30, face = "bold"),
+        axis.text.y = element_text(size = 30, face = "bold"))
+```
+
+```{r}
+# reorder individuals so that facet figures of trial groups (particularly inbetween
+# trials where trial numbers are different) look neat
+max_values <- choices %>%
+  group_by(individual) %>%
+  summarise(max_value = max(rank_trial)) %>%
+  arrange(max_value)
+# Reorder the levels of the individual factor based on the maximum values
+choices$individual <- factor(choices$individual, levels = max_values$individual)
+# below can be used to reassign sequential numerical codes for individuals
+# choices <- choices %>%
+#  mutate(individual = match(individual, unique(individual)))
+
+# note that there was a training type (this is an old comment, what does it mean, when were the training types?!)
+# and finally, some individuals came into experiment later and may have missed training type?
+# Where did the blocks occur? This might affect learning.
+# remove illegible handwriting.
+
+# performance across trials within experiments ####
+# thin stripe test and control
+
+# Add a new column indicating which trial group the trial belongs to
+# is trial within first 15 or last 15 trials
+choices <- choices %>%
+  group_by(individual, experiment, experiment_type) %>%
+  mutate(max_trial = max(rank_trial)) %>%
+  ungroup() %>% # Add a new column to denote the trial group
+  mutate(trial_group = case_when(
+    rank_trial <= 15 ~ "first_n",
+    rank_trial > max_trial - 15 ~ "last_n",
+    TRUE ~ "inbetween"
+  )) 
+
+# change thin_oblique control to a trial group within experiment 
+choices <- choices %>% ungroup %>%
+  mutate(trial_group = if_else(experiment_type == 'control', 'control', trial_group))
+
+# compare first n of test to last n of test and to the first ~15 of control
+# reset trial numbering within trial_groups: first 15 group, inbetween trials, and last 15 group
+choices <- choices %>% 
+    group_by(experiment, individual, trial_group) %>% 
+    arrange(rank_trial) %>% 
+    mutate(rank_win_group = 1:n()) %>% 
+    ungroup()
+
+# reorder trial_groups for the facetted plot to aid comparison. early trials -> later, L -> R
+choices$trial_group = factor(choices$trial_group,
+                             levels=c('first_n','inbetween', 'last_n', 'control'))
+
+# Tile plot: individuals' performance across different trial groups
+# (1st 15, last 15 and control) for thin_oblique exp
+choices %>% filter(experiment == "thin_oblique", trial_group != 'inbetween') %>%
+  filter(individual %in% c('51', '2', '32', '55')) %>%
+    ggplot(aes(y = individual, x = rank_win_group, fill = as.character(first)))+
+  geom_tile()+
+  fill_scale+
+  facet_wrap(facets = "trial_group",  ncol = 4, scales = "free_x")
+ggsave("figures//thin_oblique_tileplot_perf_across_individuals_and_trial_group.png",
+       plot = last_plot(), width = 8, height = 8, dpi =300)
+
+# Calculate the proportion of correct decisions for each trial group and CIs
+proportion_data <- choices %>%
+  filter(experiment == "thin_oblique", trial_group != 'inbetween') %>%
+  group_by(trial_group, first) %>%
+  summarise(cases = n()) %>%
+  mutate(total = sum(cases)) %>%
+  rowwise() %>%
+  mutate(tst = list(broom::tidy(prop.test(cases, total, conf.level=0.95)))) %>%
+  tidyr::unnest(tst)
+
+# Barplot with CIs: proportion correct / incorrect for different trial groups 
+# averaged across individuals
+ggplot(proportion_data, aes(x = trial_group, y = estimate, fill = as.character(first)))+ 
+  geom_col(position =  position_dodge())+
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high),
+                position = position_dodge2( width = 0.7, padding = 0.7))+
+  geom_hline(lty = 2, yintercept = 0.5)+
+  scale_fill_manual(values = c("1" = '#27b376', '0' = '#bf212f'))+
+  scale_y_continuous(labels=scales::percent)+
+  theme_classic()+
+  facet_wrap(facets = "trial_group", scales = 'free_x', ncol = 4)
+ggsave("figures//thin_oblique_barplot_perf_trial_group.png",
+       plot = last_plot(), width = 8, height = 8, dpi =300)
+
+# perhaps plot trial groups separately for easier manipulation in inkscape
+
+# Another way of visualizing which individuals' trials are used in trial_group barplots ####
+# is by highlighting the groups with grey rectangles
+choices_sub <- choices %>% filter(experiment == "thin_oblique",
+                   individual %in% c('51', '2', '32', '55'))
+ggplot(choices_sub, aes(y = individual, x = rank_trial, fill = as.character(first)))+
+  geom_tile()+
+  fill_scale+
+  facet_wrap(facets = "experiment",  ncol = 2, scales = "free_y")+
+# Add shaded areas for first n and last n trials. Could add lineranges instead
+  geom_rect(data = choices_sub %>% filter(rank_trial <= 15),
+            aes(xmin = rank_trial - 0.5, xmax = rank_trial + 0.5,
+                ymin = as.numeric(factor(individual)) - 0.5,
+                ymax = as.numeric(factor(individual)) + 0.5),
+            fill = "grey30", alpha = 0.5, inherit.aes = FALSE) +
+  geom_rect(data = choices_sub %>% group_by(individual) %>%
+              filter(rank_trial > max(rank_trial) - 15),
+            aes(xmin = rank_trial - 0.5, xmax = rank_trial + 0.5,
+                ymin = as.numeric(factor(individual)) - 0.5,
+                ymax = as.numeric(factor(individual)) + 0.5),
+            fill = "grey30", alpha = 0.5, inherit.aes = FALSE)
+
+```
+
+repeat plots for thick_stripe exp
+```{r}
+
+# Tile plot: individuals' performance across different trial groups
+# (1st 15, last 15 and control) for thin_oblique exp
+choices %>% filter(experiment == "thick_oblique") %>%
+  filter(trial_group != 'inbetween') %>%
+  filter(! individual %in% c('33', '11')) %>%
+    ggplot(aes(y = individual, x = rank_win_group, fill = as.character(first)))+
+  geom_tile()+
+  fill_scale+
+  facet_wrap(facets = "trial_group",  ncol = 4, scales = "free_x")
+ggsave("figures//thick_oblique_tileplot_perf_across_individuals_and_trial_group.png",
+       plot = last_plot(), width = 8, height = 8, dpi =300)
+
+  
+# its evident from this figure that 33, 11 and even 51 can be excluded from the figure,
+# not enough trials. probably still informative for the logistic regression however
+# What is also evident is that the logistic regression for perp para is going to be based mainly
+# on one individual in later trials, which perhaps hampers conclusions drawn from comparing
+# learning slopes between experiments
+
+# Calculate the proportion of correct decisions for each trial group and CIs
+proportion_data <- choices %>%
+  filter(experiment == "thick_oblique", trial_group != 'inbetween') %>%
+  # I'm removing particular individuals from last_n because this might bias last_n downwards.
+  # What am I actually trying to do with last_n? Give a representation of how well the wasps can do 
+  # the tasks after a significant number of trials? To simplify this, Could I just look at the perf after 
+  # n_trials instead? I guess that would depend on whether there are differences in learning speed
+  # or something?
+  filter( ! (individual %in% c('33', '11') & trial_group == "last_n")) %>%  
+  # above filter is removing rows / trials from individuals that had few trials overall and 
+  # are these trials are in the last n group, as this biases avg last_n downwards.
+  # first n trials for those individuals are kept, as this is still informative
+  group_by(trial_group, first) %>%
+  summarise(cases = n()) %>%
+  mutate(total = sum(cases)) %>%
+  rowwise() %>%
+  mutate(tst = list(broom::tidy(prop.test(cases, total, conf.level=0.95)))) %>%
+  tidyr::unnest(tst)
+
+# Barplot with CIs: proportion correct / incorrect for different trial groups 
+# averaged across individuals
+ggplot(proportion_data, aes(x = trial_group, y = estimate, fill = as.character(first)))+ 
+  geom_col(position =  position_dodge())+
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high),
+                position = position_dodge2( width = 0.7, padding = 0.7))+
+  geom_hline(lty = 2, yintercept = 0.5)+
+  scale_fill_manual(values = c("1" = '#27b376', '0' = '#bf212f'))+
+  scale_y_continuous(labels=scales::percent)+
+  theme_classic()+
+  facet_wrap(facets = "trial_group", scales = 'free_x', ncol = 4)
+  ggsave("figures//thick_oblique_barplot_perf_trial_group.png",
+       plot = last_plot(), width = 8, height = 8, dpi =300)
+
+
+
+```
+
+```{r}
+# repeat above tile and bar plots for perp_para exp
+
+# Tile plot: individuals' performance across different trial groups
+# (1st 15, last 15 and control) for thin_oblique exp
+choices %>% filter(experiment == "perp_para") %>%
+  filter(trial_group != 'inbetween') %>%
+  filter(! individual %in% c('51', '33', '11')) %>%
+    ggplot(aes(y = individual, x = rank_win_group, fill = as.character(first)))+
+  geom_tile()+
+  fill_scale+
+  facet_wrap(facets = "trial_group",  ncol = 4, scales = "free_x")+
+  theme_classic()
+ggsave("figures//perp_para_tileplot_perf_across_individuals_and_trial_group.png",
+       plot = last_plot(), width = 8, height = 4, dpi =300)
+
+# its evident from this figure that 33, 11 and even 51 can be excluded from the figure,
+# not enough trials. probably still informative for the logistic regression however
+# What is also evident is that the logistic regression for perp para is going to be based mainly
+# on one individual in later trials, which perhaps hampers conclusions drawn from comparing
+# learning slopes between experiments
+
+# Calculate the proportion of correct decisions for each trial group and CIs
+proportion_data <- choices %>%
+  filter(experiment == "perp_para", trial_group != 'inbetween') %>%
+  filter( ! (individual %in% c('51', '33', '11') & trial_group == "last_n")) %>% 
+  # above filter is removing rows / trials from individuals that had few trials overall and 
+  # are these trials are in the last n group, as this biases avg last_n downwards.
+  # first n trials for those individuals are kept, as this is still informative
+  group_by(trial_group, first) %>%
+  summarise(cases = n()) %>%
+  mutate(total = sum(cases)) %>%
+  rowwise() %>%
+  mutate(tst = list(broom::tidy(prop.test(cases, total, conf.level=0.95)))) %>%
+  tidyr::unnest(tst)
+
+
+# Barplot with CIs: proportion correct / incorrect for different trial groups 
+# averaged across individuals
+ggplot(proportion_data, aes(x = trial_group, y = estimate,
+                            fill = as.character(first)))+ 
+  geom_col(position =  position_dodge())+
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high),
+                position = position_dodge2( width = 0.7, padding = 0.7))+
+  geom_hline(lty = 2, yintercept = 0.5, size = 0.8)+
+  scale_fill_manual(values = c("1" = '#27b376', '0' = '#bf212f'))+
+  scale_y_continuous(sec.axis = dup_axis(), labels=scales::percent)+
+  facet_wrap(facets = "trial_group", scales = 'free_x', ncol = 4)+
+  labs(y = "Correct / incorrect decision chance")+
+  custom_theme_text_enlarged
+ggsave("figures//perp_para_barplot_perf_across_trial_group.png", plot = last_plot(),
+       width = 8, height = 8, dpi =300)
+
+# Add in canopy exp data, for Megalopta
+
+```
+
+```{r}
+
+# repeating plots for nat can experiment
+
+# Tile plot: individuals' performance across different trial groups
+# (1st 15, last 15 and control) for nat can exp
+choices %>% filter(experiment == "nat_can") %>%
+  #filter(trial_group != 'inbetween') %>%
+  filter(! individual %in% c("35", "11")) %>%
+    ggplot(aes(y = individual, x = rank_win_group, fill = as.character(first)))+
+  geom_tile()+
+  fill_scale+
+  facet_wrap(facets = "trial_group",  ncol = 4, scales = "free_x")+
+  theme_classic()
+ggsave("figures//perp_para_tileplot_perf_across_individuals_and_trial_group.png",
+       plot = last_plot(), width = 8, height = 8, dpi =300)
+
+# its evident from this figure that 33, 11 and even 51 can be excluded from the figure,
+# not enough trials. probably still informative for the logistic regression however
+# What is also evident is that the logistic regression for perp para is going to be based mainly
+# on one individual in later trials, which perhaps hampers conclusions drawn from comparing
+# learning slopes between experiments
+
+# Calculate the proportion of correct decisions for each trial group and CIs
+proportion_data <- choices %>%
+  filter(experiment == "nat_can", trial_group != 'inbetween') %>%
+  filter( ! (individual %in% c('35', '11') & trial_group == "last_n")) %>% 
+  # above filter is removing rows / trials from individuals that had few trials overall and 
+  # are these trials are in the last n group, as this biases avg last_n downwards.
+  # first n trials for those individuals are kept, as this is still informative
+  group_by(trial_group, first) %>%
+  summarise(cases = n()) %>%
+  mutate(total = sum(cases)) %>%
+  rowwise() %>%
+  mutate(tst = list(broom::tidy(prop.test(cases, total, conf.level=0.95)))) %>%
+  tidyr::unnest(tst)
+
+
+# Barplot with CIs: proportion correct / incorrect for different trial groups 
+# averaged across individuals
+ggplot(proportion_data, aes(x = trial_group, y = estimate,
+                            fill = as.character(first)))+ 
+  geom_col(position =  position_dodge())+
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high),
+                position = position_dodge2( width = 0.7, padding = 0.7))+
+  geom_hline(lty = 2, yintercept = 0.5, size = 0.8)+
+  scale_fill_manual(values = c("1" = '#27b376', '0' = '#bf212f'))+
+  scale_y_continuous(labels=scales::percent)+
+  facet_wrap(facets = "trial_group", scales = 'free_x', ncol = 4)+
+  labs(y = "Correct / incorrect decision chance")+
+  custom_theme_text_enlarged+
+  theme(legend.position = NULL)
+ggsave("figures//perp_para_barplot_perf_across_trial_group.png", plot = last_plot(),
+       width = 8, height = 8, dpi =300)
+
+
+```
+
+
+```{r}
+
+#### logistic regression of performance across trials ####
+
+# I only want to compare the curves of thick +-45 vs thin +-45 vs 0 / 90 during TESTING types
+# to do that I'll make a new variable where control is excluded from thin_oblique testing
+
+choices_test <- choices[choices$experiment_type != 'control',]
+
+fit <- glm(first ~ rank_trial * factor(experiment), data = choices_test, family = binomial)
+summary(fit)
+
+choices_test$predicted_probabilities <- predict(fit, type = "response")
+
+ggplot(data = choices_test, 
+       aes(x = rank_trial, y = predicted_probabilities, color = as.factor(experiment))) +
+  geom_line()
+
+# run log reg and plot again:
+fit <- glm(first ~ rank_trial * factor(experiment), data = choices_test, family = binomial)
+summary(fit)
+
+choices_test$predicted_probabilities <- predict(fit, type = "response")
+
+ggplot(data = choices_test, 
+       aes(x = rank_trial, y = predicted_probabilities,
+           color = as.factor(experiment), fill = as.factor(experiment)))+
+  geom_smooth(method = "glm", method.args = list(family = binomial), alpha = 0.5)+
+  labs(x = "Trial number", y = "% of decisions correct")+
+  scale_y_continuous(labels = scales::percent)+
+  scale_colour_viridis_d()+
+  scale_fill_viridis_d()+
+  #  scale_color_brewer(type = "qual", palette = "Set3")+
+  geom_hline(yintercept = 0.5, lty = 2, size = 1.5)+
+  custom_theme_text_enlarged+
+  theme(legend.position = "none",
+        #panel.border = element_rect(
+        #linetype = "solid", colour = "black", size=5, fill = NA),
+        axis.line = element_line(colour = 'black', size = 1.5),
+        axis.ticks = element_line(colour = "black", size = 1.5),
+        axis.ticks.length=unit(.3, "cm"),
+        plot.margin = margin(15,1,5,1),
+        #axis.text.x=element_blank(),
+        #axis.ticks.x=element_blank()
+        )
+ggsave("//Users//andrescheepers//Desktop//berlin_ICN_poster//exp_comp_lineplot_perf_across_trials.png", plot = last_plot(),
+       width = 8, height = 8, dpi =300)
+# How do we interpret these stats?
+# ggsave("figures//optflow_log_reg_thin_oblique.png", plot = last_plot(), width = 5, height = 3, dpi = 300)
+
+# comparing means of groups at a particular value of trial number:
+# Load necessary libraries
+library(emmeans)
+library(multcomp)
+library(multcompView)
+
+# Fit the logistic regression model with interaction
+model <- glm(first ~ experiment * rank_trial, data = choices_test, family = binomial)
+summary(model)
+
+# Calculate adjusted predicted probabilities for a specific value of the covariate (e.g., the mean value)
+max_covariate_thick_obl <- max(choices_test[choices_test$experiment == "thick_oblique",]$rank_trial)
+emm <- emmeans(model, ~ experiment | rank_trial,
+               at = list(rank_trial = max_covariate_thick_obl), type = "response")
+print(emm)
+plot(emm, comparisons = TRUE)
+
+# Perform pairwise comparisons
+pairs <- pairs(emm, adjust = "tukey")
+print(pairs)
+
+# Get compact letter display for significant differences
+cld <- cld(emm, adjust = "tukey", Letters = letters, type = "response")
+print(cld)
+
+# Convert results to data frames
+emm_df <- as.data.frame(emm)
+cld_df <- as.data.frame(cld)
+
+# Inspect the structure of the data frames to identify correct column names
+str(emm_df)
+str(cld_df)
+
+
+# Plotting the results with correct column names
+ggplot(emm_df, aes(x = experiment, y = prob, fill = experiment)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9),
+           color = "black", size = 1.5)+
+  geom_errorbar(aes(ymin = prob - SE, ymax = prob + SE), width = 0.2, position = position_dodge(width = 0.9)) +
+  geom_text(data = cld_df,
+            aes(x = experiment, y = prob + 0.08, label = .group),
+            color = "black", size = 10,
+            position = position_dodge2(width = 1, padding = 100)) +
+  labs(x = "Group",
+       y = "Predicted Probability")+
+  #scale_fill_brewer(type = "qual", palette = "Set3")+
+  scale_fill_viridis_d()+
+  custom_theme_text_enlarged+
+    theme(legend.position = "none",
+        #panel.border = element_rect(
+          #linetype = "solid", colour = "black", size=5, fill = NA),
+        axis.line = element_line(colour = 'black', size = 1.5),
+        axis.ticks = element_line(colour = "black", size = 1.5),
+        axis.ticks.length=unit(.3, "cm"),
+        plot.margin = margin(15,1,5,1),
+        #axis.text.x=element_blank(),
+        #axis.ticks.x=element_blank()
+        )
+ggsave(
+  "//Users//andrescheepers//Desktop//berlin_ICN_poster//exp_comp_barplot_perf_across_experiments_after_46_trials.png",
+       plot = last_plot(),
+       width = 8, height = 8, dpi =300)
+
+```
+
+ICN berlin plots
+
+```{r}
+
+
+# para and perp: ####
+proportion_data <- choices %>%
+  filter(experiment == "perp_para", trial_group == 'last_n') %>%
+  filter( ! (individual %in% c('51', '33', '11') & trial_group == "last_n")) %>% 
+  # above filter is removing rows / trials from individuals that had few trials overall and 
+  # are these trials are in the last n group, as this biases avg last_n downwards.
+  # first n trials for those individuals are kept, as this is still informative
+  group_by(trial_group, first) %>%
+  summarise(cases = n()) %>%
+  mutate(total = sum(cases)) %>%
+  rowwise() %>%
+  mutate(tst = list(broom::tidy(prop.test(cases, total, conf.level=0.95)))) %>%
+  tidyr::unnest(tst)
+
+ggplot(proportion_data, aes(x = trial_group, y = estimate,
+                            fill = as.character(first)))+ 
+  geom_col(position =  position_dodge(), color = "black", size = 1.5)+
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high),
+                position = position_dodge2( width = 0.7, padding = 0.7))+
+  geom_hline(lty = 2, yintercept = 0.5, size = 1.5)+
+  scale_fill_manual(values = c("1" = '#27b376', '0' = '#bf212f'))+
+    scale_x_discrete(expand = c(0.07,0.4))+
+  scale_y_continuous(expand = c(0,0), limits = c(0,1), sec.axis = dup_axis(), labels=scales::percent)+
+  #facet_wrap(facets = "trial_group", scales = 'free_x', ncol = 4)+
+  #labs(y = "Correct / incorrect decision chance")+
+  labs(x = NULL, y = NULL)+
+  custom_theme_text_enlarged+
+  theme(legend.position = "none",
+        #panel.border = element_rect(
+          #linetype = "solid", colour = "black", size=5, fill = NA),
+        axis.line = element_line(colour = 'black', size = 1.5),
+        axis.ticks = element_line(colour = "black", size = 1.5),
+        axis.ticks.length=unit(.3, "cm"),
+        plot.margin = margin(15,1,5,1),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("//Users//andrescheepers//Desktop/berlin_ICN_poster//perp_para_barplot_perf_across_trial_group.png", plot = last_plot(),
+       width = 5.5, height = 8, dpi =300)
+
+# thin oblique ####
+
+# reorder individuals so that facet figures of trial groups (particularly inbetween
+# trials where trial numbers are different) look neat
+max_values <- choices %>%
+  group_by(individual) %>%
+  summarise(max_value = max(rank_trial)) %>%
+  arrange(max_value)
+# Reorder the levels of the individual factor based on the maximum values
+choices$individual <- factor(choices$individual, levels = max_values$individual)
+
+# Add a new column indicating which trial group the trial belongs to
+# is trial within first 15 or last 15 trials
+choices <- choices %>%
+  group_by(individual, experiment, experiment_type) %>%
+  mutate(max_trial = max(rank_trial)) %>%
+  ungroup() %>% # Add a new column to denote the trial group
+  mutate(trial_group = case_when(
+    rank_trial <= 15 ~ "first_n",
+    rank_trial > max_trial - 15 ~ "last_n",
+    TRUE ~ "inbetween"
+  )) 
+
+# change thin_oblique control to a trial group within experiment 
+choices <- choices %>% ungroup %>%
+  mutate(trial_group = if_else(experiment_type == 'control', 'control', trial_group))
+
+# compare first n of test to last n of test and to the first ~15 of control
+# reset trial numbering within trial_groups: first 15 group, inbetween trials, and last 15 group
+choices <- choices %>% 
+    group_by(experiment, individual, trial_group) %>% 
+    arrange(rank_trial) %>% 
+    mutate(rank_win_group = 1:n()) %>% 
+    ungroup()
+
+# reorder trial_groups for the facetted plot to aid comparison. early trials -> later, L -> R
+choices$trial_group = factor(choices$trial_group,
+                             levels=c('first_n','inbetween', 'last_n', 'control'))
+
+# Tile plot: individuals' performance across different trial groups
+# (1st 15, last 15 and control) for thin_oblique exp
+choices %>% filter(experiment == "thin_oblique", trial_group != 'inbetween') %>%
+  filter(individual %in% c('51', '2', '32', '55')) %>%
+    ggplot(aes(y = individual, x = rank_win_group, fill = as.character(first)))+
+  geom_tile()+
+  fill_scale+
+  facet_wrap(facets = "trial_group",  ncol = 4, scales = "free_x")
+ggsave("figures//thin_oblique_tileplot_perf_across_individuals_and_trial_group.png",
+       plot = last_plot(), width = 8, height = 8, dpi =300)
+
+# Calculate the proportion of correct decisions for each trial group and CIs
+proportion_data <- choices %>%
+  filter(experiment == "thin_oblique", trial_group == 'control') %>%
+  group_by(trial_group, first) %>%
+  summarise(cases = n()) %>%
+  mutate(total = sum(cases)) %>%
+  rowwise() %>%
+  mutate(tst = list(broom::tidy(prop.test(cases, total, conf.level=0.95)))) %>%
+  tidyr::unnest(tst)
+
+# Barplot with CIs: proportion correct / incorrect for different trial groups 
+# averaged across individuals
+proportion_data %>% filter(first == "0") %>%
+  ggplot(aes(x = trial_group, y = estimate,
+                            fill = as.character(first)))+ 
+  geom_col(position =  position_dodge(0.94), width = 0.9, color = "black", size = 1.5)+
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = .33,
+                position = position_dodge2(width = 0.7, padding = 0.7))+
+  geom_hline(lty = 2, yintercept = 0.5, size = 1.5)+
+  scale_fill_manual(values = c("1" = '#27b376', '0' = '#bf212f'))+
+  scale_x_discrete(expand = c(0.08,0.4))+
+  scale_y_continuous(expand = c(0,0), limits = c(0,1),
+                     labels=scales::percent, position =  "left")+
+  #facet_wrap(facets = "trial_group", scales = 'free_x', ncol = 4)+
+  #labs(y = "Correct / incorrect decision chance")+
+  labs(x = NULL, y = NULL)+
+  custom_theme_text_enlarged+
+  theme(legend.position = "none",
+        #panel.border = element_rect(
+          #linetype = "solid", colour = "black", size=5, fill = NA),
+        axis.line = element_line(colour = 'black', size = 1.5),
+        axis.ticks = element_line(colour = "black", size = 1.5),
+        axis.ticks.length=unit(.3, "cm"),
+        plot.margin = margin(15,1,5,1),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+ggsave("//Users//andrescheepers//Desktop/berlin_ICN_poster//thin_oblique_barplot_perf_control_incorrect.png", plot = last_plot(),
+       width = 3.2, height = 8, dpi =300)
+
+
+#  plots for nat can experiment ####
+
+# Tile plot: individuals' performance across different trial groups
+# (1st 15, last 15 and control) for nat can exp
+choices %>% filter(experiment == "nat_can") %>%
+  #filter(trial_group != 'inbetween') %>%
+  filter(! individual %in% c("35", "11")) %>%
+    ggplot(aes(y = individual, x = rank_win_group, fill = as.character(first)))+
+  geom_tile()+
+  fill_scale+
+  facet_wrap(facets = "trial_group",  ncol = 4, scales = "free_x")+
+  theme_classic()
+ggsave("figures//perp_para_tileplot_perf_across_individuals_and_trial_group.png",
+       plot = last_plot(), width = 8, height = 8, dpi =300)
+
+# its evident from this figure that 33, 11 and even 51 can be excluded from the figure,
+# not enough trials. probably still informative for the logistic regression however
+# What is also evident is that the logistic regression for perp para is going to be based mainly
+# on one individual in later trials, which perhaps hampers conclusions drawn from comparing
+# learning slopes between experiments
+
+# Calculate the proportion of correct decisions for each trial group and CIs
+proportion_data <- choices %>%
+  filter(experiment == "nat_can", trial_group != 'inbetween') %>%
+  filter( ! (individual %in% c('35', '11') & trial_group == "last_n")) %>% 
+  # above filter is removing rows / trials from individuals that had few trials overall and 
+  # are these trials are in the last n group, as this biases avg last_n downwards.
+  # first n trials for those individuals are kept, as this is still informative
+  group_by(trial_group, first) %>%
+  summarise(cases = n()) %>%
+  mutate(total = sum(cases)) %>%
+  rowwise() %>%
+  mutate(tst = list(broom::tidy(prop.test(cases, total, conf.level=0.95)))) %>%
+  tidyr::unnest(tst)
+
+# Barplot with CIs: proportion correct / incorrect for different trial groups 
+# averaged across individuals
+proportion_data %>% 
+  ggplot(aes(x = trial_group, y = estimate,
+                            fill = as.character(first)))+ 
+  geom_col(position =  position_dodge(0.94), width = 0.9, color = "black", size = 1.5)+
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high),
+                position = position_dodge2(width = 0.7, padding = 0.7))+
+  geom_hline(lty = 2, yintercept = 0.5, size = 1.5)+
+  scale_fill_manual(values = c("1" = '#27b376', '0' = '#bf212f'))+
+  scale_x_discrete(expand = c(0.08,0.4))+
+  scale_y_continuous(expand = c(0,0), limits = c(0,1),
+                     labels=scales::percent, position =  "left")+
+  #facet_wrap(facets = "trial_group", scales = 'free_x', ncol = 4)+
+  #labs(y = "Correct / incorrect decision chance")+
+  labs(x = NULL, y = NULL)+
+  custom_theme_text_enlarged+
+  theme(legend.position = "none",
+        #panel.border = element_rect(
+          #linetype = "solid", colour = "black", size=5, fill = NA),
+        axis.line = element_line(colour = 'black', size = 1.5),
+        axis.ticks = element_line(colour = "black", size = 1.5),
+        axis.ticks.length=unit(.3, "cm"),
+        plot.margin = margin(15,1,5,1),
+        #axis.text.x=element_blank(),
+        #axis.ticks.x=element_blank()
+        )
+ggsave("//Users//andrescheepers//Desktop/berlin_ICN_poster//natcan_perf_across_trial_group.png",
+       plot = last_plot(),
+       width = 6, height = 8, dpi =300)
+
+# thick_stripe exp ####
+
+# Tile plot: individuals' performance across different trial groups
+# (1st 15, last 15 and control) for thin_oblique exp
+choices %>% filter(experiment == "thick_oblique") %>%
+  filter(trial_group != 'inbetween') %>%
+  filter(! individual %in% c('33', '11')) %>%
+    ggplot(aes(y = individual, x = rank_win_group, fill = as.character(first)))+
+  geom_tile()+
+  fill_scale+
+  facet_wrap(facets = "trial_group",  ncol = 4, scales = "free_x")
+ggsave("figures//thick_oblique_tileplot_perf_across_individuals_and_trial_group.png",
+       plot = last_plot(), width = 8, height = 8, dpi =300)
+
+  
+# its evident from this figure that 33, 11 and even 51 can be excluded from the figure,
+# not enough trials. probably still informative for the logistic regression however
+# What is also evident is that the logistic regression for perp para is going to be based mainly
+# on one individual in later trials, which perhaps hampers conclusions drawn from comparing
+# learning slopes between experiments
+
+# Calculate the proportion of correct decisions for each trial group and CIs
+proportion_data <- choices %>%
+  filter(experiment == "thick_oblique", trial_group != 'inbetween') %>%
+  filter( ! (individual %in% c('33', '11') & trial_group == "last_n")) %>% 
+  # above filter is removing rows / trials from individuals that had few trials overall and 
+  # are these trials are in the last n group, as this biases avg last_n downwards.
+  # first n trials for those individuals are kept, as this is still informative
+  group_by(trial_group, first) %>%
+  summarise(cases = n()) %>%
+  mutate(total = sum(cases)) %>%
+  rowwise() %>%
+  mutate(tst = list(broom::tidy(prop.test(cases, total, conf.level=0.95)))) %>%
+  tidyr::unnest(tst)
+
+
+# Barplot with CIs: proportion correct / incorrect for different trial groups 
+# averaged across individuals
+proportion_data %>% 
+  ggplot(aes(x = trial_group, y = estimate,
+                            fill = as.character(first)))+ 
+  geom_col(position =  position_dodge(0.94), width = 0.9, color = "black", size = 1.5)+
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high),
+                position = position_dodge2(width = 0.7, padding = 0.7))+
+  geom_hline(lty = 2, yintercept = 0.5, size = 1.5)+
+  scale_fill_manual(values = c("1" = '#27b376', '0' = '#bf212f'))+
+  scale_x_discrete(expand = c(0.08,0.4))+
+  scale_y_continuous(expand = c(0,0), limits = c(0,1),
+                     labels=scales::percent, position =  "left")+
+  #facet_wrap(facets = "trial_group", scales = 'free_x', ncol = 4)+
+  #labs(y = "Correct / incorrect decision chance")+
+  labs(x = NULL, y = NULL)+
+  custom_theme_text_enlarged+
+  theme(legend.position = "none",
+        #panel.border = element_rect(
+          #linetype = "solid", colour = "black", size=5, fill = NA),
+        axis.line = element_line(colour = 'black', size = 1.5),
+        axis.ticks = element_line(colour = "black", size = 1.5),
+        axis.ticks.length=unit(.3, "cm"),
+        plot.margin = margin(15,1,5,1),
+        #axis.text.x=element_blank(),
+        #axis.ticks.x=element_blank()
+        )
+ggsave("//Users//andrescheepers//Desktop/berlin_ICN_poster//thick_stripe_perf_across_trial_group.png",
+       plot = last_plot(),
+       width = 6, height = 8, dpi =300)
+
+  
+
+```
+
+```{r}
+# This chunk mostly rubbish
+# alternate version of above tileplot for vg present
+perp_para %>%
+  filter(individual %in% c("13", "51", "53")) %>% 
+  mutate(first = as.character(first),
+                     individual = factor(individual, levels = 
+                                              c("13", "51", "53")),
+                   stimuli = factor(stimuli, levels = rev(c("test","ctrl")))) 
+
+choices %>% 
+  filter(experiment != "thick_oblique") %>%
+  mutate(first = as.character(first),
+         individual = factor(individual,
+                             levels = rev(c("2", "11", "31", "32", "33", "51", "55"))),
+                   experiment = factor(
+                     experiment, levels = rev(c("thick_oblique",
+                                            "thin_oblique",
+                                            "control")))) %>%
+  ggplot(aes(y = experiment, x = rank_trial, fill = first))+
+  geom_tile()+
+    scale_fill_manual(values = c("0" = "#e41a1c", "1" = "#4daf4a"), 
+                    breaks = c( "1","0"), 
+                    labels = c("Correct", "Incorrect"))+
+  scale_y_discrete(labels = c("Control", "Test"))+
+  labs(x = "Trial", y = "Experiment", fill = "First decision")+
+  facet_wrap(facets = "individual",  ncol = 1, scales = "free_y",
+             labeller = labeller(individual = ~ paste("Individual: ", .),
+                                 .multi_line = F))
+  ggsave("figures//optflow_tileplot_vg_version.png", plot = last_plot(), width = 6, height = 8, dpi = 300)
+
+# average decision accuracies across all trials for each experiment #
+
+# not a reflection of their optimal decision accuracy as it includes a learning type and logistic regression seems to suggest there is an effect of trial number
+# Most of this code below is just a poor way of showing the data and can probs be deleted as its better above
+
+# Calculate the proportion of correct decisions for each experiment
+# More formulaic way of calculating confidence intervals
+# alpha <- 0.95 # Confidence level
+# z_value <- qnorm((1 + alpha) / 2) # Z-value for confidence interval
+# proportion_data <- proportion_data %>%
+#   mutate(se = sqrt(proportion_correct * (1 - proportion_correct) / n),
+#          conf_interval = z_value * se)
+
+### Comparing thick_oblique and thin stripe performance ####
+# bar plot with CIs
+ggplot(proportion_data, aes(x = experiment, y = proportion_correct)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8)) +
+  geom_errorbar(aes(ymin = proportion_correct - conf_interval, ymax = proportion_correct + conf_interval),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  labs(x = "Experiment", y = "Proportion Correct") 
+
+# comparing thin stripes control to testing type. 
+proportion_data %>% filter(experiment != "thick_oblique") %>%
+ggplot(aes(x = experiment, y = proportion_correct)) +
+  geom_point(size = 3)+
+  geom_hline(yintercept = 0.5, lty = 2)+
+  scale_y_continuous(labels = scales::percent)+
+  geom_errorbar(aes(ymin = proportion_correct - conf_interval, ymax = proportion_correct + conf_interval),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  labs(x = "Experiment", y = "Percent correct decisions") +
+  theme_minimal()+
+  custom_theme_text_enlarged+
+    scale_x_discrete(labels = c("Test", "Control", "Thick stripe"))
+ggsave("figures//optflow_point_and_errorbars.png", plot = last_plot(), width = 4, height = 3, dpi = 300)
+
+```
+
+```{r}
+# more pretty ugly plots
+
+# visualize how proportion correct changes across trial ####
+choices %>% filter(experiment == "thick_oblique") %>%
+  group_by(rank_trial, first) %>%
+  summarise(count = n()) %>%
+  group_by(rank_trial) %>%
+  mutate(proportion = count / sum(count),
+         first = as.character(first)) %>%
+  ggplot(aes(x = rank_trial, y = proportion, fill = first)) +
+  geom_col(position = "fill")+
+  geom_hline(yintercept = 0.5, lty = 2)+
+  scale_y_continuous(labels = scales::percent)+
+  scale_fill_manual(values = c("0" = "#e41a1c", "1" = "#4daf4a"), 
+                    breaks = c( "1","0"), 
+                    labels = c("Correct", "Incorrect"))+
+  labs(fill = "First decision", x = "Trial", y = "Percent of decisions correct / incorrect")+
+  theme_minimal()+
+  theme(axis.title.x = element_text(size = 14),  
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 14))  
+ggsave("figures//my_plot.png", plot = last_plot(), width = 10, height = 6, dpi = 300)
+
+
+```
+
+parallel versus perpendicular results
+
+```{r}
+
+# Tile plot ####
+facet_labels <- c(thin_oblique = "multiple thin 45 degree stripes",
+                          thick_oblique = "single thick stripe",
+                          control = "control")
+
+perp_para %>%
+  filter(individual %in% c("13", "51", "53")) %>% 
+  mutate(first = as.character(first),
+                     individual = factor(individual, levels = 
+                                              rev(c("13", "51", "53"))),
+                   stimuli = factor(stimuli, levels = rev(c("test","ctrl")))) %>%
+  ggplot(aes(y = stimuli, x = rank_trial, fill = first))+
+  geom_tile()+
+  facet_wrap(~ individual,  ncol = 1,
+             labeller = labeller(individual = ~ paste("Individual: ", .),
+                                 .multi_line = F),
+             scales = "free_y")+
+  labs(x = "Trial", y = "Experiment", fill = "Choice")+
+  scale_fill_manual(values = c("0" = "#e41a1c", "1" = "#4daf4a"), 
+                    breaks = c( "1","0"), 
+                    labels = c("Rewarding", "Unrewarding"))+
+  scale_y_discrete(labels = c("Control", "Test"))+
+  theme_bw()+
+  theme(panel.grid = element_blank(),
+        legend.position = "top",
+        axis.title.x = element_text(size = 14),
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14))
+ggsave("figures//perppara_tileplot.png", plot = last_plot(), width = 6, height = 6, dpi = 300)
+
+# point plot with confidence intervals ####
+
+proportion_data <- perp_para %>%
+  group_by(stimuli) %>%
+  summarise(proportion_correct = mean(first, na.rm = T),
+            n = n())
+# Calculate the confidence intervals
+alpha <- 0.95 # Confidence level
+z_value <- qnorm((1 + alpha) / 2) # Z-value for confidence interval
+proportion_data <- proportion_data %>%
+  mutate(se = sqrt(proportion_correct * (1 - proportion_correct) / n),
+         conf_interval = z_value * se)
+
+proportion_data %>% 
+  mutate(stimuli = factor(stimuli, levels = c("test","ctrl"))) %>%
+ggplot(aes(x = stimuli, y = proportion_correct)) +
+  geom_point(size = 3)+
+  geom_hline(yintercept = 0.5, lty = 2)+
+  scale_y_continuous(labels = scales::percent)+
+      scale_x_discrete(labels = c("Test", "Control"))+
+  geom_errorbar(aes(ymin = proportion_correct - conf_interval, ymax = proportion_correct + conf_interval),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  labs(y = "Percent correct decisions") +
+  theme_minimal()+
+  theme(axis.title.x = element_blank(),  
+        axis.title.y = element_text(size = 14),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 14))+
+ggsave("figures//perppara_point_and_errorbars.png", plot = last_plot(), width = 3, height = 3, dpi = 300)
+
+# logistic regression with ggplot ####
+
+test <- perp_para %>% filter(stimuli == "test")
+ctrl <- perp_para %>% filter(stimuli == "ctrl")
+
+m_test <- glm(first ~ rank_trial, data = test, family = binomial)
+m_ctrl <- glm(first ~ rank_trial, data = ctrl, family = binomial)
+summary(m_test)
+summary(m_ctrl)
+
+test$pred_prob <- predict(m_test, type = "response")
+ctrl$pred_prob <- predict(m_ctrl, type = "response")
+
+combined_data <- bind_rows(test %>% select(first, rank_trial, pred_prob),
+                           ctrl %>% select(first, rank_trial, pred_prob))
+combined_data %>% filter(stimuli == "test") %>% 
+  ggplot(aes(x = rank_trial, y = pred_prob)) +
+  geom_smooth(method = "loess", se = FALSE) +
+  geom_smooth(method = "glm", method.args = list(family = binomial),
+             colour = "black", fill = "grey", alpha = 0.2) +
+  geom_hline(yintercept = 0.5, lty = 2)+
+  labs(x = "Trial", y = "Predicted probability\ncorrect decision") +
+  scale_color_manual(values = c("red", "green", "blue")) +
+  theme_minimal()+
+  theme(axis.title.y = element_text(size = 14),
+        axis.title.x = element_text(size = 14),
+        axis.text.x = element_text(size = 14),
+        axis.text.y = element_text(size = 14))
+ggsave("figures//perppara_log_reg.png", plot = last_plot(), width = 5, height = 3, dpi = 300)
+
+
+
+```
+
+
+## Things to think about
+What is the effect of the blocking I've been doing? I haven't had a very firm or consistant rule about blocking except that I do it after an individual makes consistant mistakes in one direction and appears to have a side bias. I think its important to think about because its a very effective way to teach the wasp or to accelerate its learning. I use blocking with the intention of showing the wasp that it can turn the other direction and still receive the reward. I believe that insects might need to learn to override a consistant motor command, or perhaps to learn that varying the motor commands is more effective (more rewarding) than using one motor command exclusively. I think that the wasp might need to be shown that two paths exist and that one path always contains the reward. If the wasp is not shown this, then all it knows is that it is receiving rewards in a somewhat idiosyncratic way. Perhaps the wasp does 'notice' that the pattern overhead signifies the presence of reward or the lack thereof. But it surely doesn't know that the reward exists in the other arm when it is not present in this arm. How could it? Unless it has some in-built mechanism that informs steering commands when a snapshot is not matched. This makes me wonder, what happens if you just have one arm and change the patterns and reward? Will the wasp ever learn to turn around, or increase its turning around over time? Or can this only happen when the wasp also learns that there is another location to turn around and go to? 
+
+If the wasp learns that there are two locations, does this heighten its sensitivity to the differences in the two dorsal patterns? I'm wondering if when there is only one arm / location the wasp is less sensitive to changes in the pattern because these changes can and do happen in nature.
+
+- I should account for side bias in my analyses. One effect of side bias in combination with an unequal number of trials will be an over / underestimate of decision accuracy. How can I account for too many trials on one side? I need to weight the trials from each side equally...
+
+- there are important decisions to make around which individuals to include seeing as some came into experiments at different times and may have had side preferences for longer. Im thinking #31 from recent experiments where I had too many individuals to give it proper attention and eradicate its side preference rapidly. One solution may be to analyze results with different subsets of individuals and to see whether it affects inferences.
+
+- I wonder if its not just the accuracy of first decisions that changes when you chang from patterns to no patterns but also the total number of incorrect decisions? ie do they go the same, wrong way a lot more when no patterns in? What does this mean?
+
+- humans can probably learn thousands of faces, insects can probably learn thousands of snapshots. can I learn anything from the human face recognition literature?
+
+- i wouldnt jump to the conclusion that many thin stripes is more difficult than thick stripes just from this data because thick stripes had a training session not included in the data, which could bias the proportion correct upwards.
+
+- is it really true that insects get better across trials? or is this just an effect of averaging across insects and rather there is a distinct moment that each insect 'gets it'? Would an interaction between trial and individual perhaps account for this? I haven't thought much about what the different models would be testing. 
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+TO DO:
+0. enter data and plot previous experiments. particularly interested in seeing the first control. make note of the fact that training procedures have changed...
+1. make tile plot for the cohort across thick stripe, multi small stripe and control. would be nice to annotate the onset of different days and experiments. 
+
+INF. revisit logistic regression basics to understand the stats.
+
+INF. visualize proportion correct of thick stripe, mulitple small stripes, and control.
+next, think about logistic regression and learning rates.
+
+INF. change name of 'choices' to reflect the experiment. eg. angled is a better name. If i'm still separating datasets by experiment.
+
+
+```{r}
+# old attempt making log reg curves with base R
+
+# get rid of NAs in data so it plays nice with min and max functions. 
+# could also use na.rm = T in the functions, but NAs may cause problems anywhere
+# need to look into NAs and remove / change them earlier.
+
+### base plot effort ####
+# logit = function(x) log(x/(1-x))
+# invlogit = function(x) 1/(1+exp(-x))
+# 
+# # Fit logistic regression model for each experiment
+# m_thick <- glm(first ~ rank_trial,
+#                data = choices[choices$experiment == "thick_oblique",],
+#                family = binomial)
+# m_thin <- glm(first ~ rank_trial,
+#               data = choices[choices$experiment == "thin_oblique",],
+#               family = binomial)
+# m_ctrl <- glm(first ~ rank_trial,
+#               data = choices[choices$experiment == "control",],
+#               family = binomial)
+# # Summary of the model
+# summary(m_thick)
+# summary(m_thin)
+# summary(m_ctrl)
+
+# thin stripe regression
+#pdf("figures//my_base_plot.pdf", width = 8, height = 6)
+
+thin_x_pred = with(choices[choices$experiment == "thin_oblique", ], seq(from=min(rank_trial), to=max(rank_trial), by=0.01))
+
+with(choices[choices$experiment == "thin_oblique",],
+     plot(x = c(min(rank_trial), max(rank_trial)),
+          y = c(0, 1), type = "n", xlab = "Trial", ylab = "Predicted probability of correct decision"))
+
+thin_predicted_probs <- predict(m_thin, newdata=list(rank_trial=thin_x_pred),  type = "response", se.fit = TRUE)
+lines(thin_x_pred, thin_predicted_probs$fit)
+polygon(c(thin_x_pred, rev(thin_x_pred)),
+        c(thin_predicted_probs$fit+1.96*thin_predicted_probs$se.fit, 
+                          rev(thin_predicted_probs$fit-1.96*thin_predicted_probs$se.fit)), 
+        col = rgb(0,.3,1,.5), border = FALSE)
+dev.off()
+# thick
+x_pred = with(choices[choices$experiment == "thick_oblique", ], seq(from=min(rank_trial), to=max(rank_trial), by=0.01))
+
+with(choices[choices$experiment == "thick_oblique",],
+     plot(x = c(min(rank_trial), max(rank_trial)),
+          y = c(0, 1), type = "n", xlab = "Trial", ylab = "Predicted probability of correct decision"))
+
+predicted_probs <- predict(m_thick, newdata=list(rank_trial=x_pred),  type = "response", se.fit = TRUE)
+
+lines(x_pred, predicted_probs$fit)
+polygon(c(x_pred, rev(x_pred)),
+        c(predicted_probs$fit+1.96*predicted_probs$se.fit, 
+                          rev(predicted_probs$fit-1.96*predicted_probs$se.fit)), 
+        col = rgb(0,1,0,.5), border = FALSE)
+
+# control 
+ctrl_x_pred = with(choices[choices$experiment == "control", ], seq(from=min(rank_trial), to=max(rank_trial), by=0.01))
+
+with(choices[choices$experiment == "thick_oblique",],
+     plot(x = c(min(rank_trial), max(rank_trial)),
+          y = c(0, 1), type = "n", xlab = "Trial", ylab = "Predicted probability of correct decision"))
+
+ctrl_predicted_probs <- predict(m_ctrl, newdata=list(rank_trial=ctrl_x_pred),  type = "response", se.fit = TRUE)
+
+lines(ctrl_x_pred, ctrl_predicted_probs$fit)
+polygon(c(ctrl_x_pred, rev(ctrl_x_pred)),
+        c(ctrl_predicted_probs$fit+1.96*ctrl_predicted_probs$se.fit,
+          rev(ctrl_predicted_probs$fit-1.96*ctrl_predicted_probs$se.fit)), 
+        col = rgb(1,0,0,.5), border = FALSE)
+
+rm(ctrl_x_pred, thin_x_pred, thin_predicted_probs, ctrl_predicted_probs, 
+   predicted_probs, x_pred)
+
+
+```

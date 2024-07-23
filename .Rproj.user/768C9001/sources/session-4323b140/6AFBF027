@@ -1,0 +1,26 @@
+{
+    "id": "6AFBF027",
+    "path": "~/Library/CloudStorage/OneDrive-LundUniversity/PhD/projects/wasp project/analysis/data_analysis_2023/data_analysis_2023.Rmd",
+    "project_path": "data_analysis_2023.Rmd",
+    "type": "r_markdown",
+    "hash": "3979724128",
+    "contents": "",
+    "dirty": false,
+    "created": 1721472272388.0,
+    "source_on_save": false,
+    "relative_order": 8,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "182,17",
+        "scrollLine": "171"
+    },
+    "folds": "15|27|42|0|\n44|6|151|0|\n154|6|210|0|\n212|6|267|0|\n269|6|325|0|\n328|6|441|0|\n445|6|712|0|\n448|17|486|0|\n714|6|780|0|\n782|6|810|0|\n814|6|911|0|\n",
+    "lastKnownWriteTime": 1721746660,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1721754746695,
+    "read_only": false,
+    "read_only_alternatives": []
+}

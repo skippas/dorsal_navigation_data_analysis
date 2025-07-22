@@ -1,0 +1,22 @@
+---
+title: "results write up manuscript"
+author: "Andre"
+date: "2025-01-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+source("/Users/andrescheepers/Library/CloudStorage/OneDrive-LundUniversity/PhD/projects/dorsal_snapshot_discrimination_project/analysis/data_analysis_2023.Rmd")
+source("loading_cleaning.R")
+
+
+```
+
+```{r pressure, echo=FALSE}
+
+```

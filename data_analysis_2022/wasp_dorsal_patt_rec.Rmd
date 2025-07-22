@@ -1,0 +1,364 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+```
+
+
+```{r, results=FALSE, message=FALSE, echo=FALSE}
+library(tidyverse)
+library(data.table)
+sep12 <- readxl::read_excel("data//waspDecisions_2022-10-03.xlsx", sheet = "220912")
+sep13 <- readxl::read_excel("data//waspDecisions_2022-10-03.xlsx", sheet = "220913")
+sep14 <- readxl::read_excel("data//waspDecisions_2022-10-03.xlsx", sheet = "220914")
+sep15 <- readxl::read_excel("data//waspDecisions_2022-10-03.xlsx", sheet = "220915")
+
+sep15_patt_rem <- readxl::read_excel("data//waspDecisions_2022-10-03.xlsx", sheet = "220915_patterns_removed")
+sep17_patt_rem <- readxl::read_excel("data//waspDecisions_2022-10-03.xlsx", sheet = "20220917_patterns_removed")
+para_rew <- readxl::read_excel("data//waspDecisions_2022-10-03.xlsx", sheet = "220913.conflict")
+
+sep12 <- sep12[1:25, 1:9]
+sep13 <- sep13[1:26,]
+sep14 <- sep14[1:25,]
+sep15 <- sep15[1:25,]
+
+sep17_patt_rem <-  sep17_patt_rem[1:25,]
+sep15_patt_rem <- sep15_patt_rem[1:25,]
+para_rew <- para_rew[1:25,]
+
+sep12 <- pivot_longer(sep12, !individual, values_to = "decision", 
+                      names_to = "trial", values_drop_na = TRUE) %>%
+    separate(trial, into = c("trial_number", "reward_stim_side"))
+
+perp_rew <- list(sep13, sep14, sep15)
+names(perp_rew) <- c("13-09-2022", "14-09-2022", "15-09-2022")
+perp_rew <- lapply(perp_rew, function(x){
+  x %>% pivot_longer(!individual, values_to = "decision", 
+                      names_to = "trial", values_drop_na = TRUE) %>%
+  separate(trial, into = c("trial_start", "trial_stop","trial_number", "reward_stim_side")) 
+})
+
+patt_rem <- list(sep15_patt_rem, sep17_patt_rem)
+names(patt_rem) <- c("15-09-2022", "17-09-2022")
+patt_rem <- lapply(patt_rem, function(x){
+  x %>% pivot_longer(!individual, values_to = "decision",
+                     names_to = "trial", values_drop_na = TRUE) %>%
+  separate(trial, into = c("trial_start", "trial_stop", "reward_stim_side",
+                           "pattern_removal_chamber"))
+})
+
+para_rew <- pivot_longer(para_rew, !individual, values_to = "decision", 
+                      names_to = "trial", values_drop_na = TRUE) %>%
+  separate(trial, into = c("trial_start", "trial_stop","trial_number", "reward_stim_side"))
+para_rew$date <- "13-09-2022"
+
+perp_rew <- rbindlist(perp_rew, idcol = "date")
+patt_rem<- rbindlist(patt_rem, idcol = "date")
+sep12$date <- "12-09-2022"
+sep12$trial_start <- NA
+sep12$trial_stop <- NA
+patt_rem$trial_number <- NA
+
+perp_rew <- rbind(sep12, perp_rew)
+
+rm(sep12, sep13, sep14, sep15, sep15_patt_rem, sep17_patt_rem)
+
+perp_rew$exp_type <- "treatment"
+patt_rem$exp_type <- "control"
+para_rew$exp_type = "control"
+
+dors_exp <- list(para_rew, perp_rew, patt_rem)
+names(dors_exp) <- c("para_rew", "perp_rew", "patt_rem")
+dors_exp <- lapply(dors_exp, function(x){
+  x$decision <- gsub("X", "0", x$decision)
+  x$decision <- gsub("T", "1", x$decision)
+  x
+})
+list2env(dors_exp ,.GlobalEnv)
+```
+
+# Wasp dorsal pattern recognition
+
+Methods:
+
+Three different experiments / types of trial were run, not necessarily chronologically.
+The first experiment (perpendicular rewarding)
+involved training wasps to associate a dorsally positioned square-wave grating that was
+oriented perpendicular to the long axis of the Y-maze arm with a food reward. In one arm the 
+perpendicular pattern was present while in the other a square-wave grating oriented parallel 
+to the arms long-axis was positioned dorsally.
+The aim here was to determine whether wasps were able to choose the correct (rewarding)
+arm of the Y-maze at above-chance rates using only information provided by the dorsally positioned patterns. To test whether wasps were able to use the information provided by the dorsal patterns I ran a binomial test to assess whether the observed proportion of correct
+decisions could plausibly have been produced by a decision-making process with an underlying probability of choosing the correct arm of 50%. ie. How likely the observed proportion of correct decisions may have arisen through wasps 'guessing' which arm the reward was in, as would be the case
+if they were unable to use the information provided by the patterns in the dorsal visual field.
+
+The second experiment (parallel rewarding) was run directly after the first. Here the food-reward was no longer placed in the arm bearing the perpendicular 
+pattern but rather the arm bearing the parallel pattern. Thus 'correct' decisions in this experiment are those where the wasp chose the chamber with the parallel pattern. The expectation here was that 
+wasps trained to associate the food reward with the perpendicular pattern during the first 
+experiment would, initially, continue to choose the arm of the y-maze bearing the perpindicular 
+pattern, thereby making incorrect decisions (ie. entering the arm / chamber without food) at a similar rate to the rate they made correct decisions
+during the first experiment. The rate at which wasps make correct decisions should then gradually
+increase as the wasps begin to learn to associate the parallel pattern with food.
+Here I used a 'difference between two proportions' test to test whether the proportion of correct decisions was lower in this experiments trials (where the parallel pattern was placed in the same arm as the food-reward) than in  experiment 1 trials (where the perpendicular 
+pattern was placed in the same arm as the food reward). 
+
+After retraining the wasps to the perpindicular pattern, the third experiment ('front pattern removed') involved removing the patterns from the front *or* back chambers and counting the number of correct decisions wasps made during trials. ie. This experiment is the same as experiment 1, except that either the patterns in the front (first) or back (second) chambers of each y-maze arm are removed. In trials where the front patterns were removed, I expected the rate of correct decisions to be lower here than in trials run during the first experiment, because in this experiment there was no information 
+available to inform the wasp in which arm the food reward was contained. Thus I expected wasps
+would have to 'guess' which arm contained the reward, and that they would therefore have a correct decision rate of approximately 50%. I ran the same difference in proportions test as above to test whether the correct decision proportion was higher in experiment 1 trials than in trials where the front patterns were removed.
+
+To add: pattern-side randomization, wasp marking (the fact that new individuals were trained into the experiment under the same numbers), The Y-maze, Experiment timeline, The structure of trials (duration, the fact that only first decisions were recorded), training. Expand on what constituted a decision, ie. entering the second chamber.
+
+#
+
+```{r, echo=FALSE,fig.dim=c(9,6), fig.show='hide', message=FALSE}
+library(RColorBrewer)
+decision_fill_scale<- scale_fill_manual(name = "Decision", labels = c("1" = "correct", "0" = "incorrect"),
+                                        values = c("1" = "#00966f", "0" = "#ffc609"))
+
+perp_rew$reward_patt <- "perpindicular"
+para_rew$reward_patt <- "paralell"
+perp_vs_para <- rbind(perp_rew, para_rew)
+perp_vs_para$trial_number <- fct_reorder(perp_vs_para$trial_number, as.integer(perp_vs_para$trial_number))
+perp_vs_para$reward_patt <- fct_relevel(perp_vs_para$reward_patt, "paralell", after = Inf)
+perp_vs_para %>% 
+  group_by(reward_patt, date, trial_number, decision) %>%
+  summarise(n = n()) %>% 
+  mutate(prop = n / sum(n)) %>%
+  ggplot(aes(x = trial_number, y = prop, fill = decision))+
+    geom_col()+
+    facet_grid(cols = vars(date, reward_patt),
+               scales = "free_x", space = "free_x", labeller = label_both)+
+  decision_fill_scale+
+  theme(legend.position = "top")
+
+# To do: add 50% line. add all experiments and days.
+
+```
+
+```{r, echo= FALSE, fig.show='hide', message=FALSE}
+
+patt_rem %>% 
+  group_by(pattern_removal_chamber, date, trial_start, decision) %>%
+  summarise(n = n()) %>% 
+  mutate(prop = n / sum(n)) %>%
+  ggplot(aes(x = trial_start, y = prop, fill = decision))+
+    geom_col(position = position_stack(reverse = TRUE))+
+  decision_fill_scale+
+  facet_grid(cols = vars(date, pattern_removal_chamber), 
+             scales = "free_x", space = "free_x")
+# uncertainty associated with bars would be nice
+# first thing to test is that they've learned perp = rewarding ie. not guessing 
+# ie. decision accuracy > 50%.
+
+```
+
+```{r, fig.dim= c(8,8)}
+patt_rem$reward_patt <- "perpendicular"
+perp_vs_para$pattern_removal_chamber <- NA
+patt_rem <- patt_rem %>% mutate(trial_number = as.integer(factor(trial_start)))
+patt_rem$trial_number <- patt_rem$trial_number+50
+perp_vs_para$exp_type <- perp_vs_para$reward_patt
+patt_rem$exp_type <- patt_rem$pattern_removal_chamber
+
+all_exp <- rbind(patt_rem, perp_vs_para) 
+all_exp$trial_number <- fct_rev(fct_relevel(all_exp$trial_number, function(x){as.character(sort(as.integer(x)))}))
+all_exp$exp_type <- fct_relevel(all_exp$exp_type, "perpindicular", "back", "front")
+all_exp %>%
+  group_by(exp_type, date, trial_number, decision) %>%
+  summarise(n = n()) %>% 
+  mutate(prop = n / sum(n)) %>%
+  ggplot(aes(y = trial_number, x = prop, fill = decision))+
+    geom_col()+
+    facet_grid(rows = vars(date, exp_type),
+               scales = "free", space = "free")+
+  decision_fill_scale+
+  xlab("Proportion of decisions")+
+  ylab("Trial number")+
+  theme(legend.position = "right")
+
+```
+
+Figure 1. The proportion of wasp decisions within single trials that were correct 
+and incorrect on different days and during different experiments. Note the drop in proportion
+correct decisions (ie. proportion of decisions to enter the arm containing the reward) on the 13th of September when the rewarding pattern (ie. the pattern showed in the arm containing the reward) was changed suddenly from perpendicular to parallel and on the 17th of September when the patterns were removed from the front (first) chambers in each arm. Also note that removing the patterns from the back chambers of each arm apparently has no effect. *single bar without legible title is a single trial where the front patterns were removed on the 15th of September.
+
+
+```{r, echo= FALSE, message=FALSE, include=FALSE}
+
+# table resource: https://cran.r-project.org/web/packages/DescTools/vignettes/TablesInR.pdf
+perp_vs_para$decision <- fct_relevel(perp_vs_para$decision, "0", after = Inf)
+tbl_perp_para <- with(perp_vs_para, table(reward_patt, decision))
+binom.test(tbl_perp_para[1,], p = 0.5, alternative = "greater")
+
+```
+
+One sided exact binomial test shows that the probability of making a correct (see above for definition) decision is significantly greater than 0.5 when the rewarding pattern is 
+perpindicular. 
+(other experiments, eg. paralell rewarding are possibly also greater than 0.5 however). 
+The lower bound of the one sided confidence interval is 0.809, suggesting that there is 
+only a 5% chance that the true underlying probability of correct decisions is lower than 80.9%.
+
+```{r, echo = FALSE}
+patt_rem$decision <- fct_relevel(patt_rem$decision, "0", after = Inf)
+tbl_patt_rem <- with(patt_rem, table(pattern_removal_chamber, decision))
+
+exp_fill_scale <- scale_fill_manual(
+  labels = c(
+    "perpendicular rewarding", "parallel rewarding", "front chamber pattern removed"),
+  values = c(
+  "front_removed" = "#ff20b5", 
+  "parallel_rewarding" ="#5d55b2", 
+  "perp_rewarding" = "#003f5c"))
+
+decisions <- list(tbl_patt_rem["front", ], tbl_perp_para["perpindicular", ],
+     tbl_perp_para["paralell", ] )
+results <- lapply(decisions, binom.test)
+ci <- sapply(results, "[[", "conf.int")
+prop <- sapply(results, "[[", "estimate")
+
+data.frame(experiment = c("front_removed", "perp_rewarding", "paralell_rewarding"),
+           ci_lower = ci[1,],
+           ci_upper = ci[2,],
+           prop = prop) %>%
+  mutate(experiment = fct_rev(experiment)) %>%
+  ggplot(aes(x = experiment, y = prop, fill = experiment))+
+    geom_bar(position = "dodge", stat = "identity")+
+  geom_errorbar(aes(ymin = ci_lower, ymax =  ci_upper), width = 0.2)+
+  exp_fill_scale+
+  xlab("Different experiments")+
+  ylab("Proportion of correct decisions across all trials")+
+  theme(legend.position = "top")
+
+# difference in proportions
+
+
+# figure out a solution for trial number versus start times. 
+
+# simplified figure for ICIV
+library(binom)
+tbl_perp_para <- with(perp_vs_para, table(reward_patt, decision))[1,]
+perpar <- as.data.frame(tbl_perp_para)
+perpar$decision <- c("per", "par")
+perpar$n <- rep(416 + 80, 2)
+colnames(perpar) <- c("decision_counts", "decision_type", "n")
+perpar$lowerci <- NA
+perpar$upperci <- NA 
+perpar <- with(perpar, binom.confint(decision_counts, n))[1:2,]
+perpar$decision <- c("perpindicular", "parallel")
+
+# I dropped the labels part of scale bc it doesn't map properly for some reason
+exp_fill_scale <- scale_fill_manual(
+  values = c(
+  "perpindicular" = "#edf8b1",
+  "parallel" = "#7fcdbb"))
+
+decisions <- decisions[1:2]
+results <- lapply(decisions, binom.test)
+ci <- sapply(results, "[[", "conf.int")
+prop <- sapply(results, "[[", "estimate")
+
+
+tiff("test.tiff", units="in", width=5, height=5, res=300)
+
+ggplot(perpar, aes(x = decision, y = mean, fill = decision))+
+    geom_bar(position = "dodge", stat = "identity")+
+  geom_errorbar(aes(ymin = lower, ymax =  upper), width = 0.2, linewidth = 1, colour = "#0c0c0cc3")+
+  geom_hline(yintercept = 0.5, lty = 2, linewidth = 1, colour = "#0c0c0cc3")+
+  ylim(0, 1)+
+  labs(y = "proportion of choices", x = NULL)+
+  exp_fill_scale+
+  theme_minimal()+
+  theme(plot.background =  element_rect(fill = "#e9e2ddff", colour = "#e9e2ddff"),
+        panel.background = element_rect(fill = "#e9e2ddff", colour = "#e9e2ddff"),
+        legend.position = "none", 
+        panel.grid.major = element_blank(),
+        #panel.grid.minor = element_blank(),
+        axis.text.y = element_text(size = 25, face = "bold"),
+        axis.text.x = element_blank(),
+        #axis.text.x = element_text(size = 25, face = "bold"),
+        axis.title.y = element_text(size = 30, face = "bold"))
+
+dev.off()
+  
+```
+
+
+
+Figure 2. Proportion of correct decisions across all trials for three different experiments. Note the lower proportion correct in trials where the parallel was rewarding and where the front chamber patterns were removed. Note also that the proportion of correct decisions when the rewarding pattern is parallel is much higher than expected, and that the confidence interval for the proportion of correct decisions in trials nearly includes 50%, which would suggest 'guessing' by wasps.
+
+```{r, echo= FALSE}
+
+prop_diffs <- list(rbind(tbl_perp_para["perpindicular", ], tbl_patt_rem["front", ]), 
+     rbind(tbl_perp_para["perpindicular", ], tbl_perp_para["paralell", ]))
+prop_diffs <- lapply(prop_diffs, prop.test)
+
+tbl_perp_vs_front <- rbind(tbl_perp_para["perpindicular",], tbl_patt_rem["front", ])
+p_diff <- vector(length = 2)
+p_diff[1] <- apply(proportions(tbl_perp_vs_front, 1), 2, diff, 1)[2]
+p_diff[2] <- apply(proportions(tbl_perp_para, 1), 2, diff, 1)[2]
+
+cis <- sapply(prop_diffs, "[[", "conf.int")
+data.frame(contrast = c("perpindicular-front", "perpindicular-paralell"),
+           lower_ci = cis[1,],
+           upper_ci = cis[2,],
+           p_diff =  p_diff )  %>%
+  ggplot(aes(y = contrast, xmin = lower_ci, xmax = upper_ci, x = p_diff))+
+  geom_errorbar(width = 0.2)+
+  geom_point()+
+  geom_vline(xintercept = 0, lty = 2)+
+    xlab("Proportion correct decisions in exp 1 - proportion correct in exp 2 and 3")
+
+```
+
+Figure 3. The difference in proportion of correct decisions among experiments. Black dots show the proportion correct decisions in experiment 1 trials minus the proportion correct in experiment 2 or 3 trials. 95% Confidence intervals show the uncertainty around the differences in proportions.
+
+Results:
+
+The proportion of correct decisions under the perpendicular rewarding experiment (experiment 1) across all trials was 0.839 (figure 2), ie. this data suggests that the true underlying probability of a correct decision in experiment 1 is most likely to be 83.9%. It is very unlikely that the true underlying probability of a correct decision on this experiment is lower than 80.9%. Processes with true underlying probabilities lower than 80.9% produce the observed data in < 5% of cases, and a process that has a true underlying probability of making the correct decision 50% of the time is expected to produce the observed data in < 2.2e-16 cases (p-value < 2.2e-16). Thus we can confidently say that the wasps have a true underlying probability of making the correct decision in this experiment that is much larger than 50%, and probably lies between 0.839 ± `r 0.839 - 0.803`.
+
+Results from the second experiment were unexpected. Although the proportion of correct decisions is lower (0.681 ± `r 0.681 - 0.616`) than when the rewarding pattern is perpendicular (0.839 ± `r 0.839 - 0.803`), it should be much lower (1-0.839 = 0.161), as the proportion of wrong decisions in the second experiment should be roughly equivalent to the proportion correct in the first experiment (at least in initial trials). It is possible that wasps were able to follow each other or view the net covering the feeder in the non-rewarding arm by flying outside the setup, thus resulting in a much greater proportion of correct decisions than initially expected.
+
+Results from the third experiment were more in line with expectations. I expected the proportion of correct decisions to be around 0.5, as wasps had no information from the first chamber about which arm held the reward, so would have had to 'guess' which arms second chamber to enter. The data suggests the true proportion of correct decisions during this experiment was 0.636 ± `r 0.636 - 0.4956315`. Thus the interval for the 95% margin of error includes 0.5 (0.496, 0.762). 
+The proportion of correct decisions is also significantly lower than in experiment 1 (ie. the true difference in proportions is unlikely to be zero (p.value = `r prop_diffs[[1]]$p.value`)) (figure 3). The difference in proportions of correct decisions (proportion correct in experiment 1 - proportion correct experiment 3) is 0.202 and the 95% margin of error is (0.061, 	
+0.344) 
+
+
+```{r, include=FALSE}
+# 
+#   TO DO:
+# - have CIs and estimates in a single neat and easily accessible table to make writing and inserting the stats into the text easier
+# - complete and neaten figures.
+# - focus on explaining figures, results and statistics
+# - short discussion and further work
+# - short intro
+# - short methods
+# - neaten report and compile
+# - send
+# - a plot of decision probability through time for the different experiments.
+#       - does the conflict experiment affect learning the next day? (perhaps we retrained them however, im not sure)
+# - Is there some way to account for inter-individual variation? statistically.
+# - and to determine the effect / presence of a side preference?
+# - pictures of setup
+# 
+#   
+#   would be nice to also look at the side of the rewarding pattern across trials,
+# the number of decisions per trial,
+# the performance of individuals across trials.
+# 
+# the most interesting details of these results are the lack of massive effect
+# when removing patterns on the 13th and the strong effect of front pattern removal
+# on last days
+# to do that just calculate the proportions correct and their confidence intervals
+# for each session / exp type, and order the bars by date.
+
+```
+
+Resources:
+
+jb statistics 
+- videos on bernoulli, binomial and statistics book. see website
+3blue 1brown 
+- trusting amazon reviews

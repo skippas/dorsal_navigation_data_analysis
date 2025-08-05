@@ -221,7 +221,9 @@ perp_para_2025 <- perp_para_2025_sheets %>%
     maxrows = ..4
   )) %>%
   # Remove trial 34 data because a mistake was made 
-  filter()
+  filter(trial != 34)
+
+# naturalistic canopies 2025
 
 # Honeybee (Apis) 2024 ---------------------------------------------------------
 # This dataset has different format - doesn't need pivoting

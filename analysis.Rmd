@@ -10,7 +10,6 @@ rm(list = ls())
 source("loading_cleaning.R")
 source("custom_themes_and_colour_palettes.R")
 
-
 ```
 
 Binning by trial number (experience) rather than 1st or last. better perhaps.
@@ -51,96 +50,145 @@ Plotting
 ```{r}
 
 # Arrange order in which experiments appear in facet plot
-proportion_data$experiment <- factor(
+proportion_data$experiment <- fct_relevel(
   proportion_data$experiment,
-  levels = c('perp_para', 'thin_oblique', "thick_oblique", "natcan", "thick_oblique_diff",
-             "thick_oblique_apis")
+  'perp_para', 'thin_oblique', "thick_oblique", "natcan", "thick_oblique_diff",
+             "thick_oblique_apis"  # these come first, others follow in original order
 )
+
 proportion_data$manipulation <- factor(
   proportion_data$manipulation,
   levels = c('test', 'control', "no_diffuser", "diffuser_bottom", "diffuser_whole"))
-
-# plots: proportion correct/incorrect for different trial bins ####
-proportion_data %>%
-  ggplot(aes(x = as.factor(trial_range), y = mean, group = experiment)) +
-  geom_point(position = position_dodge(0.5), size = 3) +
-  geom_line(position = position_dodge(0.5), size = 1) +
-  geom_errorbar(aes(ymin = lower, ymax = upper),
-                position = position_dodge(0.5), width = 0.2) +
-  geom_hline(lty = 2, yintercept = 0.5) +
-  scale_y_continuous(labels = scales::percent) +
-  theme_classic() +
-  theme(legend.position = "none") +
-  facet_grid(experiment ~ manipulation, scales = 'free_x', space = "free")
 
 # define different data subsets
 proportion_data <- proportion_data %>% 
   # removing bins that have low sample size
   filter(total > 10) 
 proportion_data_test_only <- proportion_data %>% 
-  filter(manipulation == "test") # only looking at so-called 'test' data
-  
-generate_plot <- function(data, same_axis = F) {
-  # below ensures Ntrial / Nwasp text doesnt overlap when diff exps plotted on same axis
-  if(same_axis == T) {
-    data <- data %>%
-      group_by(experiment) %>%
-      mutate(
-        n_wasp_offset = 0.45 - 0.03 * as.numeric(as.factor(experiment)),
-        #n_trial_offset = 0.35 - 0.015 * as.numeric(as.factor(experiment))
-        ) %>%
-      ungroup()
-    } else {
-  n_wasp_offset = 0.45
-  n_trial_offset = 0.4
-}
-ggplot(data, aes(
-    x = as.factor(trial_range),
-    y = mean, 
-    color = stimuli,
-    alpha = stimuli,
-    group = experiment))+
-  geom_point(position = position_dodge(width = 0.3), size = 3)+
-  geom_line(position = position_dodge(width = 0.3), size = 1)+
-  geom_errorbar(aes(ymin = lower, ymax = upper),
-                position = position_dodge(width = 0.3),
-                width = 0.2, alpha = 0.2)+
-  geom_hline(lty = 2, yintercept = 0.5)+
-  # geom_text(aes(label = paste0("(", wasp_n, ", ", total,")"),
-  #               y = n_wasp_offset), show.legend = FALSE)+
-  #geom_text(aes(label = paste("Nt =", total), y = n_trial_offset))+
-  #scale_color_viridis_d(labels = experiment_labels) +
-   stim_colour_scale+
-  scale_alpha_manual(values = c("natcan" = 1,
-                                "thick_oblique" = 0.3,
-                                "thin_oblique" = 0.3,
-                                "perp_para" = 0.3),
-                     guide = "none") +  # Set transparency per level
-  scale_y_continuous(labels = scales::percent)+
-  labs(y = "% choices for reward in trial bin",
-       x = "Trial",
-       colour = "Patterns:")+
-  custom_theme_no_x_grid+
-  theme(
-    legend.text = element_text(size = 12),
-    axis.text.x = element_text(size = 12),
-    axis.text.y = element_text(size = 12),
-    axis.title.x = element_text(size = 14),
-    axis.title.y = element_text(size = 14),
-    legend.position = "top")
-}
+  filter(manipulation == "test") # only looking at 'test' data (not control)
 
+source("functions/plot_generating_functions.R")
 p1 <- generate_plot(proportion_data) + 
   facet_grid(experiment ~ manipulation, scales = "free_x", space = "free")
-p1 <- generate_plot(proportion_data %>% filter(manipulation == "test", 
-                                               !experiment  %in%
-                                      c("thick_oblique")), same_axis = T) #+ 
-#  facet_grid(cols = vars(manipulation), scales = "free_x", space = "free")
- ggsave("plots//perf_bin_by_bin_for_each_experiment.png",
-        plot = last_plot(), width = 8, height = 6, dpi = 300)
 # plot the experiments on the same axes to compare prop correct / learning rates
-p2 <- generate_plot(proportion_data_test_only, same_axis = T)
-# make logistic regression (smoothed) plot combined with bin plot. find code in berlin icn script?
+
+# make a colour variable that higlights certain experiments / stimuli
+# eg. here I want to highlight perp_para vs perp para 2025 and also compare them
+# to other artificial stimuli, but not the naturalistic ones
+proportion_data_test_only <- proportion_data_test_only %>%
+  mutate(perp_para_vs_other_stimuli = case_when(
+    experiment == "perp_para" ~ "perp_para",
+    experiment == "perp_para_2025" ~ "perp_para_2025",
+    experiment %in% c("thick_oblique", "thin_oblique") ~ "artificial", 
+    TRUE ~ "naturalistic"  # This catches everything else
+  ))
+
+p2 <- generate_plot(filter(proportion_data_test_only, perp_para_vs_other_stimuli != "naturalistic"), same_axis = T)
+ggsave("plots//perf_bin_by_bin_for_each_experiment.png",
+        plot = last_plot(), width = 8, height = 6, dpi = 300)
+
+# Create a vector to control which groups are visible
+visible_groups <- c("natcan_3D_2025", "natcan", "natcan_2025")  # Only show group x
+proportion_data <- proportion_data %>%
+  mutate(alpha_val = ifelse(experiment %in% visible_groups, 1, 0))
+
+# divide stimuli into 'naturalistic' and artificial
+proportion_data <- proportion_data %>% 
+  mutate(nat_or_art = ifelse(
+    experiment %in% c("natcan_3D_2025", "natcan", "natcan_2025"),
+    as.character(experiment), "artificial"))
+
+# comparing naturalistic canopies to artificial
+proportion_data %>% 
+  filter(manipulation != "control",
+         experiment != "perp_para",
+         experiment != "brightness") %>%
+  ggplot(aes(x = trial_range, y = mean, group = experiment,
+             colour = nat_or_art, alpha = alpha_val))+
+  geom_point(size = 3, position = position_dodge(width = 0.3))+
+  geom_line(position = position_dodge(width = 0.3))+
+  geom_hline(lty = 2, yintercept = 0.5)+
+  geom_errorbar(aes(ymin = lower, ymax = upper),
+                position = position_dodge(width = 0.3),
+                width = 0.2, alpha = 0.1)+
+  #scale_alpha_identity()+
+  scale_color_manual(
+    values = c(
+      "natcan" = "#E31A1C",      # Red for naturalistic Group1
+      "natcan_2025" = "#1F78B4",      # Blue for naturalistic Group2  
+      "natcan_3D_2025" = "#33A02C",      # Green for naturalistic Group3
+      "artificial" = "black"     # Black for all artificial groups
+    ))+
+    scale_y_continuous(labels = scales::percent)+
+    labs(y = "% choices for reward in trial bin",
+         x = "Trial bin")+
+  facet_grid(cols = vars(manipulation), scales = "free_x", space = "free")+
+  theme_classic()+
+  theme(legend.position = "none")
+ggsave("plots//naturalistic_vs_artificial//nat_vs_art_across_trial_ranges.png",
+        plot = last_plot(), width = 6, height = 6, dpi = 300)
+
+# just looking at overall prop correct during test, or average of the last 30 trials
+source("functions//bin_trials.R")
+last_15_trials <- subset_last_n_trials(choices, trial_variable = "rank_trial")
+last_15_trials_prop <- calc_cis(last_15_trials, group_vars = c("experiment"))
+
+last_15_trials_prop <- last_15_trials_prop %>% 
+  mutate(nat_or_art_color = ifelse(
+    experiment %in% c("natcan_3D_2025", "natcan", "natcan_2025"),
+    as.character(experiment), "artificial"))
+
+last_15_trials_prop <- last_15_trials_prop %>%
+  mutate(nat_or_art = ifelse(
+    experiment %in% c("natcan_3D_2025", "natcan", "natcan_2025"),
+    "naturalistic", "artificial"))
+  
+x <- last_15_trials_prop %>%
+  filter(
+         experiment != "perp_para",
+         experiment != "brightness") %>%
+  ggplot(aes(x = nat_or_art, y = mean, group = experiment, colour = nat_or_art_color))+
+  geom_point(position = position_dodge(width = 0.5), size = 3)+
+    geom_errorbar(aes(ymin = lower, ymax = upper),
+                  position = position_dodge(width = 0.5),
+                  width = 0.2)+
+  geom_hline(lty = 2, yintercept = 0.5)+
+  scale_y_continuous(labels = scales::percent)+
+    labs(y = "% choices for reward in last 15 trials",
+         x = "Stimuli")+
+    scale_color_manual(
+    values = c(
+      "natcan" = "#E31A1C",      # Red for naturalistic Group1
+      "natcan_2025" = "#1F78B4",      # Blue for naturalistic Group2  
+      "natcan_3D_2025" = "#33A02C",      # Green for naturalistic Group3
+      "artificial" = "black"     # Black for all artificial groups
+    ))+
+  # scale_color_manual(
+  #   values = c(
+  #     "naturalistic" = "#33A02C",      # Green for naturalistic 
+  #     "artificial" = "black"     # Black for all artificial groups
+  #   ))+
+  theme_classic()+
+  theme(legend.position = "none")
+ggsave("plots//naturalistic_vs_artificial//nat_vs_art_last_n.png",
+        plot = x, width = 3, height = 4.5, dpi = 300)
+
+proportion_data_test_only <- proportion_data_test_only %>%
+  mutate(perp_para_vs_other_stimuli = case_when(
+    experiment == "brightness" ~ "brightness",
+    experiment %in% c("thick_oblique", "thick_oblique_diff" ,"thin_oblique",
+                      "perp_para_2025", "perp_para") ~ "artificial", 
+    TRUE ~ "naturalistic"  # This catches everything else
+  ))
+
+visible_groups <- c("brightness")  # Only show group x
+proportion_data_test_only <- proportion_data_test_only %>%
+  mutate(alpha_val = ifelse(experiment %in% visible_groups, 1, 0.3))
+
+proportion_data_test_only %>%
+  generate_plot(same_axis = T) 
+ggsave("plots//brightness.png",
+        plot = last_plot(), width = 6, height = 4.5, dpi = 300)
 
 # something weird going on in below plot. due to control issue?
 # what are the grey trial blocks from? should be filtered in loading_cleaning?
@@ -152,6 +200,49 @@ choices %>%
   fill_scale +
   facet_grid(experiment ~ trial_bin, scales = "free") +
   theme_bw()
+
+```
+
+```{r}
+
+# look at data per individual within an experiment
+# 1. across the whole experiment
+# 2. within trial bins at different stages of the experiment
+
+# first, need to get proportion data per individual.
+# quick improvements : 
+# why dont error bars and points overlap
+ind_props <- calc_cis(
+  choices, group_vars = c("indiv_code", "experiment", "manipulation",
+                          "trial_range", "stimuli"))
+
+ind_props %>% filter(experiment == "natcan_2025",
+                     ! indiv_code %in% c("NA_55", "NA_54", "NA_52", "NA_44")) %>%
+  plot_ind_perf_across_trials()
+  
+ind_props %>%
+  filter(experiment == "natcan_3D_2025",
+         # filter out individuals that weren't present for much of the experiment (perhaps a bit aggressive here? 23 was around for about half of experiment)
+         ! indiv_code %in% c("NA_55", "NA_15", "NA_23")) %>% 
+  plot_ind_perf_across_trials()
+
+# check prop correct across all trials and / or from trial 30-60
+ind_props <- calc_cis(
+  choices, group_vars = c("indiv_code", "experiment", "manipulation", "stimuli"))
+
+ind_props %>% filter(experiment == "natcan_2025",
+                     ! indiv_code %in% c("NA_55", "NA_54", "NA_52", "NA_44")) %>%
+  plot_ind_perf_over_exp()
+
+ind_props %>% filter(experiment == "natcan_3D_2025",
+                     ! indiv_code %in% c("NA_55", "NA_15", "NA_23")) %>%
+  plot_ind_perf_over_exp()
+
+# next steps: 
+# look at side biases of individuals
+# how do i compartmentalize this individuals analysis? separate analysis script?
+# or do we analyze all the indivs within the different experiments in this script?
+
 
 ```
 

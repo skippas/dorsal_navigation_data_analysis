@@ -1,3 +1,7 @@
+# TO DO:
+# Change individual numbers to individual codes. ie. the column indiv should 
+# have codes not numbers (which are ambiguouos between exps)
+
 # ==============================================================================
 # WASP BEHAVIORAL DATA PROCESSING PIPELINE
 # ==============================================================================
@@ -223,7 +227,53 @@ perp_para_2025 <- perp_para_2025_sheets %>%
   # Remove trial 34 data because a mistake was made 
   filter(trial != 34)
 
-# naturalistic canopies 2025
+# naturalistic canopies 2025 ---------------------------------------------------
+natcan_2025_sheets <- tibble(
+  sheet = c("300725_natcan", "310725natcan", "010825natcan"),
+  date = c("30-07-2025", "31-07-2025", "01-08-2025"),
+  manipulation = c("test", "test", "test"),
+  maxrows = rep(14, 3)
+)
+
+natcan_2025 <- natcan_2025_sheets %>%
+  pmap_dfr(~ read_and_process_sheet(
+    file_path = DATA_PATH_2025,
+    sheet_name = ..1,
+    date = ..2,
+    experiment = "natcan_2025",
+    manipulation = ..3,
+    maxrows = ..4
+  ))
+
+# naturalistic 3D canopies 2025 ------------------------------------------------
+
+natcan_3D_2025_sheets <- tibble(
+  sheet = c("080825_natcan_3D", "090825_natcan_3D", "090825_natcan_3D_ctrl"),
+  date = c("08-08-2025", "09-08-2025", "09-08-2025"),
+  manipulation = c("test", "test", "control"),
+  maxrows = rep(14, 3)
+)
+
+natcan_3D_2025 <- natcan_3D_2025_sheets %>%
+  pmap_dfr(~ read_and_process_sheet(
+    file_path = DATA_PATH_2025,
+    sheet_name = ..1,
+    date = ..2,
+    experiment = "natcan_3D_2025",
+    manipulation = ..3,
+    maxrows = ..4
+  ))
+
+# brightness discrimination 2025 -----------------------------------------------
+
+brightness <- read_and_process_sheet(
+  file_path = DATA_PATH_2025,
+  sheet_name = "250725_brightness_diff",
+  date = c("08-08-2025"),
+  manipulation = c("test"),
+  maxrows = 14,
+  experiment = "brightness"
+)
 
 # Honeybee (Apis) 2024 ---------------------------------------------------------
 # This dataset has different format - doesn't need pivoting
@@ -251,6 +301,9 @@ choices <- bind_rows(
   natcan_2023,
   thick_oblique_diff_2024,
   perp_para_2025,
+  natcan_2025,
+  natcan_3D_2025, 
+  brightness,
   apis_2024
 )
 

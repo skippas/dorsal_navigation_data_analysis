@@ -5,8 +5,6 @@ color_scale <- scale_color_manual(name = "first_decision", values = bin_fill)
 grad_scale <- scale_colour_gradient2(low = bin_fill[2], high = bin_fill[1], 
                                      midpoint = 0.5, limit = c(0,1), space = "Lab")
 
-#theme_set(theme_minimal())
-
 custom_theme_no_y_grid <- theme_grey() +
   theme(
     panel.grid.major.y = element_blank(),  # Remove major horizontal grid lines
@@ -42,4 +40,7 @@ stim_colour_scale <- scale_colour_manual(
   drop = T,
   breaks = c("thick_oblique", "thick_oblique_diff", "thick_oblique_apis", "thin_oblique", "perp_para", "natcan"),
   labels = experiment_labels )
+
+# create a naturalistic vs artificial colour scale
+
 

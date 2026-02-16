@@ -1,0 +1,836 @@
+---
+title: "glm_analysis"
+format:
+  pdf:
+    include-in-header:
+      text: |
+        \newcommand{\Pcorr}{\(P_{\mathrm{corr}}\)}
+execute:
+  dir: project
+  
+---
+
+```{r quarto settings, echo=FALSE}
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+knitr::opts_chunk$set(
+  echo    = FALSE,  # hide code
+  message = FALSE,  # hide package messages
+  warning = FALSE   # hide warnings
+)
+
+```
+
+```{r loading raw data, include=FALSE}
+
+# load up the raw data
+
+rm(list = ls())
+library(here)
+library(lme4)
+library(broom.mixed)
+library(tidyverse)
+library(emmeans)
+library(zoo)
+library(scales)
+source("scripts//loading_cleaning.R")
+source("scripts//custom_themes_and_colour_palettes.R")
+
+# removing data that isn't relevant to the main analysis
+choices %<>% filter(
+  ! experiment %in% c("thick_oblique_apis", "thickOb_140823", "thickObDiff_210924",
+                      "perpPara_240723", "perpParaPostNatcan_090925"))
+
+# converting decision to numeric for modelling:
+choices$decision <- as.numeric(choices$decision)
+# making test the reference level as control always followed (chronologically):
+choices$manipulation <- relevel(choices$manipulation, ref = "test")
+
+```
+
+Make the computations necessary for all questions:
+```{r}
+
+# what I want is to have a list or dataframe of the model results for each experiment
+# so the model is run over each experiment, producing a dataframe of model results for each experiment
+# then i don't have to repeat this modelling exercise for each and every question
+# then i want model predictions easily from those models
+
+# classes of models:
+# 1. models to look at the test phase of experiments
+# 2. models to compare the test and the control phase
+# do 1 and 2 really need to have separate model specs? probably just have one 
+
+################################################
+
+# 1: models looking at test only
+mTest <- choices %>% 
+  filter(manipulation == "test") %>%
+  split(.$experiment, drop = T) %>%
+  # I removed day from the model below because brightDiff experiment causes trouble if its excluded. There is obviously a smarter way around that issue however
+  map(~ glmer(
+    decision ~ rank_trial + sideAlt_trial + reward_side +
+               (reward_side | individual),
+               data = .x, family = binomial))
+
+# get resuls into tidy format
+mTestTidy <- map_df(mTest, broom.mixed::tidy, .id = "experiment")
+
+# find start, mid and end trials from emmeans
+emmTestAllTrials <- map2(
+  .x = mTest, .y = names(mTest),
+  function(m, exp_id) {
+
+    emmeans(m, ~ rank_trial,
+          cov.keep = "rank_trial", # gets predictions for every trial rather than covariate avg
+          type = "response") %>%
+      as.data.frame() %>%
+      mutate(experiment = exp_id)
+    
+})
+emmTestAllTrials <- list_rbind(emmTestAllTrials)
+
+# to bring in the nat vs art variable
+emmTestAllTrials <- left_join(
+  emmTestAllTrials,
+  unique(choices[, c("experiment", "nat_or_art")]),
+  by = "experiment")
+
+# get start, end and middle of test predictions: 
+emmTestPts <- emmTestAllTrials %>% 
+  group_by(experiment) %>%
+  # get the 'mid trial'
+  mutate(mid_trial = ceiling((min(rank_trial) + max(rank_trial)) / 2)) %>%
+  filter(rank_trial == max(rank_trial) | rank_trial == 1 |
+           rank_trial == mid_trial) %>%
+  select(-mid_trial)
+
+################################################
+
+# 2: models that look at test and control:
+mTestVsCtrl <- choices %>%
+  # keep only the experiments that have a test AND control phase
+  group_by(experiment) %>%
+  filter(n_distinct(manipulation) > 1) %>% 
+  # important to drop unused factors otherwise there are lists of experiments with no data
+  split(.$experiment, drop = T) %>%
+  map( ~ glmer(
+    decision ~ rank_trial * manipulation + sideAlt_trial + reward_side +
+      (1 | individual),
+           data = .x, family = binomial))
+# it might be best to run this as one combined model to handle 'day' better. im excluding it for now as i have no idea what impact it would have
+# get resuls into tidy format
+mTestVsCtrlTidy <- map_df(mTest, broom.mixed::tidy, .id = "experiment")
+
+# to generate predictions, ill need trial number information, and values for other variables.
+# one can solve this using either predict or emmeans
+# lets go with emmeans as it 'averages over' all the variables we're not so interested in 
+emmPredCont <- map2(
+  .x = mTestVsCtrl, .y = names(mTestVsCtrl),
+  function(m, exp_id) {
+    
+    # below line allows to only keep predictions from control that actually occur 
+    # (in concert w semi-join)
+    obs <- model.frame(m) %>% distinct(manipulation, rank_trial) 
+    # get test end trial number for contrast test
+    testEnd <- max(obs[obs$manipulation == "test",]$rank_trial)
+    ctrlStart <- 1
+    
+    # get predictions for all trials
+    emmAll <- emmeans(m, ~ rank_trial * manipulation,
+          cov.keep = "rank_trial", # gets predictions for every trial rather than covariate avg
+          type = "response") %>%
+      as.data.frame() %>%
+      semi_join(obs, by = c("manipulation", "rank_trial")) %>%
+      mutate(experiment = exp_id)
+    
+    # get predictions for trials to contrast (end test and start control)
+    emmCont <- emmeans(
+      m, ~ manipulation * rank_trial,
+      at = list(rank_trial = c(ctrlStart, testEnd))
+    )
+    # exclude end control and start trial predictions
+    emmCont <- subset(
+      emmCont,
+      (manipulation == "control" & rank_trial == ctrlStart) |
+      (manipulation == "test"    & rank_trial == testEnd)
+    )
+    # ChatGPT code below. Make sure order is control@start then test@end
+    grid <- emmCont@grid
+    # below line sorts first by manipulation (control evaluates to FALSE / zero)
+    # then by rank_trial
+    ord <- order(grid$manipulation == "test", grid$rank_trial)
+    emmCont <- emmCont[ord]
+
+    cont <- contrast(
+      emmCont,
+      list("test_end - control_start" = c(-1, 1))
+    )
+    # cont <- pairs(emmCont) This is the alternative to running the custom contrast
+
+    # For reporting, you may want both link-scale test and response-scale summary
+    contLink <- as.data.frame(cont) %>%
+      mutate(
+        experiment = exp_id,
+        control_start = ctrlStart,
+        test_end = testEnd
+      )
+
+    contResp <- as.data.frame(summary(cont, type = "response")) %>%
+      mutate(
+        experiment = exp_id,
+        control_start = ctrlStart,
+        test_end = testEnd
+      )
+
+    list(emmAll = emmAll, contLink = contLink, contResp = contResp)
+    
+})
+# imagine list of lists like a table, this flips rows and cols
+emmPredCont <- transpose(emmPredCont) 
+# bind the elements within each list together
+emmPredCont <- map(emmPredCont, list_rbind)
+emmTcTrials <- emmPredCont[["emmAll"]]
+emmContLnTc <- emmPredCont[["contLink"]]
+
+# bring in the nat vs art variable
+emmTcTrials <- left_join(
+  emmTcTrials,
+  unique(choices[, c("experiment", "nat_or_art")]),
+  by = "experiment")
+
+# predictions for specific trials (end of the test and the start of the control) 
+# by subsetting all trials predictions
+emmTcPts <- emmTcTrials %>% 
+  group_by(nat_or_art, experiment, manipulation) %>%
+  filter(manipulation == "test" & rank_trial == max(rank_trial) | 
+           manipulation == "control" & rank_trial == 1) 
+# the alternative is to use predict and things get real complicated then. 
+# honestly i think the reality is actually that predict would work fine, because the other variables in the models hardly have effects?
+# and what if i just ran predict on the dataframe itself? didnt i do something like that initially?
+
+rm(list = c("emmPredCont"))
+```
+
+```{r}
+
+# prettify tables for reporting in line
+
+# do it for test results
+tbTestPts <- emmTestPts %>%
+  group_by(experiment, nat_or_art) %>%
+  # add a 'trial pos' variable that will make indexing table easier:
+  mutate(
+    trial_pos = case_when(
+      rank_trial == 1 ~ "start",
+      rank_trial == max(rank_trial, na.rm = TRUE) ~ "end",
+      rank_trial > 1 & rank_trial < max(rank_trial, na.rm = TRUE) ~ "middle"),
+    probConfint = sprintf("%.3f [%.3f, %.3f]", prob, asymp.LCL, asymp.UCL)
+    ) %>%
+  # pivot the data wider to allow for easy indexing of table
+  select(experiment, rank_trial, probConfint, trial_pos) %>%
+  pivot_wider(names_from = trial_pos,
+              values_from = c(probConfint, rank_trial)) 
+tbTestPts <- column_to_rownames(tbTestPts, "experiment")
+
+ # # %>% separate this bit into a 'pub ready' table?
+ #  select(c(experiment, rank_trial_middle, probConfint_middle,
+ #           rank_trial_end, probConfint_end)) %>%
+ #  arrange(experiment) %>%
+ #  # rename it so it's publication-ready? or ready to go into paper?
+ #  # (this will make indexing challenging)
+ #  rename(
+ #    `Pmiddle (95% CI)` = probConfint_middle,
+ #    `Pend (95% CI)`    = probConfint_end,
+ #    `Middle trial #`     = rank_trial_middle,
+ #    `End trial #`        = rank_trial_end
+ #  )
+
+################################
+
+# test + ctrl pts results
+dispTcPts <- emmTcPts %>%
+  group_by(experiment, nat_or_art) %>%
+  # add a 'trial pos' variable that will make indexing table easier:
+  mutate(
+    trial_pos = case_when(
+      rank_trial == 1 ~ "ctrlStart",
+      rank_trial == max(rank_trial, na.rm = TRUE) ~ "testEnd"),
+    confintFmt = sprintf("[%.3f, %.3f]", asymp.LCL, asymp.UCL),
+    probFmt = sprintf("%.3f", prob),
+    probConfint = sprintf("%.3f [%.3f, %.3f]", prob, asymp.LCL, asymp.UCL)
+    ) %>%
+  # pivot the data wider to allow for easy indexing of table
+  select(experiment, rank_trial, probFmt, confintFmt, probConfint, trial_pos) %>%
+  pivot_wider(names_from = trial_pos,
+              values_from = c(probFmt, confintFmt, probConfint, rank_trial)) 
+dispTcPts <- column_to_rownames(dispTcPts, "experiment")
+
+# test vs ctrl contrast results
+# function also formats rank_trial (whole numbers that are numeric). Undesirable.
+source("functions/format_numeric_cols.R")
+emmContLnTcDisp <- fmtNumCols(emmContLnTc)
+
+# do it for model results
+mTestVsCtrlTidyDisp <- cbind(
+  mTestVsCtrlTidy, pFmt = pvalue(mTestVsCtrlTidy$p.value, accuracy = 0.001))
+mTestVsCtrlTidyDisp <- fmtNumCols(mTestVsCtrlTidyDisp)
+
+# rename terms in modelResults so that they're easier to access in in-line results
+# alternative ways to do this are to assign variables new local names before the model:
+# eg: rt <- df$rank_trial , then run model like (response ~ rt) 
+term_labels <- c(
+  "(Intercept)"      = "int",
+  "rank_trial"       = "trial",
+  "reward_sideRight" = "sideR",
+  "sideAlt_trialTRUE" = "sideAltT"
+#  "rank_trial:reward_sideRight" = "Trial × Reward side"
+)
+mTestVsCtrlTidyDisp <- mTestVsCtrlTidyDisp %>% 
+  mutate(term_label = recode(term, !!!term_labels))
+
+```
+
+
+```{r}
+# create a rolling-mean dataframe so underlying raw-data can be visualised
+
+choices_rolling <- choices %>%
+  arrange(rank_trial) %>%
+  # keep nat or art along for the ride for easy subsetting later
+  group_by(individual, experiment, nat_or_art, manipulation) %>%
+  mutate(
+    pcorr = rollmean(decision, k = 3, fill = NA, align = "center")
+  ) %>%
+  # average across individuals
+  ungroup() %>% 
+  group_by(rank_trial, experiment, nat_or_art, manipulation) %>%
+  summarise(pcorr = mean(pcorr))
+
+```
+
+# Question 1: Can wasps use dorsal patterns?
+    -   Looking at test versus control proportion correct
+    -   Slope in test and control
+    -   EMmeans at end of test and control
+        -   is this essentially equivalent to binning the last n trials and making the comparison?
+
+```{r Q1}
+
+mtab1 <- mTestVsCtrlTidy %>% filter(experiment == "perpPara_170725")
+testTab1 <- emmContLnTcDisp %>% filter(experiment == "perpPara_170725")
+emmTcTrialsPer <- emmTcTrials %>% filter(experiment == "perpPara_170725")
+sumTab1 <- perpPara_170725Test %>%  
+  filter(manipulation == "test" & rank_trial == 47 |
+            manipulation == "control" & rank_trial == 1 )
+
+p <- ggplot(data = perpPara_170725Test, aes(x = rank_trial))+
+  geom_ribbon(aes(ymin = asymp.LCL, ymax = asymp.UCL), alpha = 0.2) +
+  # geom_line(aes(y = asymp.LCL), lty = 5) +
+  # geom_line(aes(y = asymp.UCL), lty = 5) +
+  geom_line(aes(x = rank_trial, y = prob)) +
+  labs(x = "Trial", y = "% of decisions for reward")+
+  scale_y_continuous(labels = scales::percent, breaks = seq(0, 1, by = 0.1))+
+  geom_hline(yintercept = 0.5, lty = 2, size = 1)+
+  custom_theme_text_enlarged+
+  facet_wrap(vars(manipulation))
+
+p <- p + geom_point(data = sumTab1, aes(x = rank_trial, y = prob)) +
+  geom_errorbar(data = sumTab1,
+                aes(x = rank_trial , ymin = asymp.LCL, ymax = asymp.UCL),
+                width= 2)
+
+p + geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr))
+
+# make the glm. 
+# ToDo: include individual in a mixed model
+perpPara_170725 <- choices[choices$experiment == "perpPara_170725",]
+
+mPerpPara <- glm(decision ~ rank_trial * manipulation + sideAlt_trial + reward_side,
+           data = perpPara_170725, family = binomial)
+
+mTab <- tidy(mPerpPara, conf.int = TRUE) %>%
+  mutate(across(where(is.numeric), ~ round(.x, 3)))
+# summary(mod_perpPara)
+
+perpPara_170725$pred_prob <- predict(mPerpPara, type = "response")
+
+p <- ggplot(data = perpPara_170725)+
+  geom_smooth(aes(x = rank_trial, y = pred_prob),
+    method = "glm", method.args = list(family = binomial), alpha = 0.5)+
+  labs(x = "Trial", y = "% of decisions for reward")+
+  scale_y_continuous(labels = scales::percent, breaks = seq(0, 1, by = 0.1))+
+  geom_hline(yintercept = 0.5, lty = 2, size = 1)+
+  custom_theme_text_enlarged+
+  facet_wrap(vars(manipulation))
+
+# find and compare probabilities at end of test and start of control
+# First get EMMs at both time points. emmeans creates a 'reference grid' # in essence this is like 'expand.grid' apparently
+emmPerpPara <- emmeans(mPerpPara, ~ manipulation * rank_trial,
+               at = list(rank_trial = c(1,47)), type = "response")
+# View / print emm object to see the order/indices and specify custom contrasts
+
+# keep only end of test and start of control so in line indexing and writing is less brittle
+sumTab <- summary(emmPerpPara) %>% 
+  filter(! manipulation == "test" & rank_trial == 1 |
+           ! manipulation == "control" & rank_trial > 1 )
+
+# add the predicted points and error bars to the plot
+p <- p + geom_point(data = sumTab, aes(x = rank_trial, y = prob)) +
+  geom_errorbar(data = sumTab,
+                aes(x = rank_trial , ymin = asymp.LCL, ymax = asymp.UCL),
+                width= 2)
+# custom contrast: compare end of test (trial 47) to start of control (trial 1)
+testTab <- as.data.frame(
+  contrast(emmPerpPara, method = list(c(0,-1,1,0)), type = "response") 
+  )
+
+# Model appears to suggest above chance choices at onset of test.
+# Add rolling mean bins to see raw data at start of test
+df_rolling <- choices_rolling %>% filter(experiment == "perpPara_170725")
+
+p + geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr))
+```
+
+
+```{r Q1 tables}
+# refactored versions of tables
+sumTab1 <- dispTcPts["perpPara_170725",]
+
+# prettify tables for in-line writing: 
+library(scales)
+testTab[,"odds.ratio"] <- round(testTab[,"odds.ratio"], digits = 3)
+testTab$p_fmt <- scales::pvalue(testTab$p.value, accuracy = 0.001)
+
+sumTab$confint <- sprintf("[%.3f, %.3f]", sumTab[,6], sumTab[,7])
+sumTab$prob_fmt <- sprintf("%.3f", sumTab[,"prob"])
+
+# rename terms in mtab so that they're easier to access in in-line results
+# alternative ways to do this are to assign variables new local names before the model:
+# eg: rt <- df$rank_trial , then run model like (response ~ rt) 
+term_labels <- c(
+  "(Intercept)"      = "int",
+  "rank_trial"       = "trial",
+  "reward_sideRight" = "sideR",
+  "sideAlt_trialTRUE" = "sideAltT"
+#  "rank_trial:reward_sideRight" = "Trial × Reward side"
+)
+mTab <- mTab %>% mutate(term_label = recode(term, !!!term_labels))
+
+# df$var creates a 1D vector, whereas df[, "var"] retains 2D structure
+mTab$confint <- sprintf("[%.3f, %.3f]", mTab$conf.low, mTab$conf.high) 
+
+# pivot wider to make in line results easier to write / access
+# but first rename
+mTab %<>% rename(est = estimate, pval = p.value) %>%
+  # only keep columns interested in
+  select(term_label, est, pval, confint) %>%
+  pivot_wider(names_from = "term_label",
+              values_from = c("est", "pval", "confint"),
+              names_glue  = "{term_label}_{.value}")
+
+# ToDo: assessing model fit
+# Here I'd like to look at pearson residuals against rank_trial. Although is there really
+# any point to this? I can see that the model doesn't fit well against rank trial simply 
+# by looking at plot. So then whats the point of looking at residuals? Is it so if you
+# have a more complex model you can assess fit?
+
+```
+
+For the test, trial number (experience) has a significant positive effect (slope) on the expected probability (\Pcorr) of correct a decision. The effect of trial on \Pcorr (or the 'slope') is `r mTab$trial_est` (95% CI: `r mTab$trial_confint`) - that is, the log odds of a correct decision increases by `r mTab$trial_est` after each successive trial. 
+
+The \Pcorr of a correct choice at the end of the test (trial 47) was higher (`r sumTab[sumTab$manipulation == "test", "prob_fmt"]`) than at the start (trial 1) of the control (\Pcorr = `r sumTab[sumTab$manipulation == "control", "prob_fmt"]`, 95% CI: `r sumTab[sumTab$manipulation == "control", "confint"]`), and this difference was significant (odds ratio = `r testTab[1,2]`, p `r testTab[1,"p_fmt"]`).
+
+Also note that the \Pcorr for the test is estimated to be significantly above chance (95% confidence ribbon does not overlap the 50% line) for the entire duration of the test. In contrast, the pcorr in the control phase is never significantly above chance for the duration of the control (95% confidence ribbon overlaps the 50% line).
+
+That the model suggests naive wasps perform above chance at the onset of the test phase (ie. in trial 1) can be attributed to the fact that the model is unable to fit the rapid learning of the wasps, rather than to the availability and learning of olfactory and / or temporal cues during the pre-test training phase. This is supported by the proportion of correct decisions in the first few 3-trial wide windows of the test phase (black points) that are clustered around 50%.
+
+# Question 2: What information are wasps using to discriminate patterns? 
+- Do they need optic flow? 
+- Can they distinguish simple brightness differences? 
+- are there differences in performance among artificial stimuli?
+
+```{r Q2, eval=TRUE}
+
+# only interested in test phase here and artificial canopies
+choices_test <- choices %>% 
+  filter(manipulation == "test" & nat_or_art == "artificial") 
+# model including day as a predictor:
+choices_test$experiment <- relevel(choices_test$experiment, ref = "perpPara_170725")
+# reading the output below is a nightmare. rather run a series of models?
+# also, homogenise the models run between the questions. glmer, same predictors
+art_glm <- glm(
+  decision ~ (rank_trial + sideAlt_trial + day + reward_side) * experiment,
+  data = choices_test, family = binomial) 
+# honestly, everything will be much simplified by just removing day from the experiment, otherwise I have to handle day in a particular way with emmeans downstream. The other (perhaps better) solution is to run day as random effect in a model that includes all experiments
+art_glm <- glm(
+  decision ~ (rank_trial + sideAlt_trial + reward_side) * experiment,
+  data = choices_test, family = binomial)
+
+first_last_trials <- tapply(
+  choices_test$rank_trial, droplevels(choices_test$experiment), max)
+
+# find emmeans
+emmArt <- emmeans(art_glm, ~ rank_trial ,
+               at = list(rank_trial = first_last_trials),
+                         by = "experiment",
+               type = "response") %>% as.data.frame()
+# with this function, you could probably also get around thed 'day issue' by mapping day to the function. That's if a reviewer insists on you including day as a factor in the analysis
+# apparently this day issue would be solved by taking an overall experiment modelling approach and modelling day as a random effect
+emmArt <- map2(.x = first_last_trials, .y = names(first_last_trials),
+     function(x, y){
+       emmeans(art_glm, ~ rank_trial,
+               at = list(
+                 experiment = y,
+                 rank_trial = c(1, x)),
+      type = "response"
+    ) %>%
+      as.data.frame() %>%
+      mutate(
+        experiment = y,
+        trial_pos = if_else(rank_trial == 1, "first", "last")
+        )
+  }
+)
+
+# plotting curves
+choices_test$predicted_probabilities <- predict(art_glm, type = "response")
+
+p <- ggplot(data = choices_test, 
+       aes(x = rank_trial, y = predicted_probabilities))+
+  geom_smooth(aes(colour = day), method = "glm", method.args = list(family = binomial), alpha = 0.5)+
+  # geom_point(data = comp_points,
+  #            aes(x = rank_trial, y = predicted_probabilities),
+  #            size = 4.5, stroke = 1.5, shape = 21, color = "black")+
+  labs(x = "Trial", y = "% of decisions for reward")+
+  scale_y_continuous(labels = scales::percent)+
+  scale_colour_viridis_d()+
+  # scale_fill_viridis_d()+
+  #  scale_color_brewer(type = "qual", palette = "Set3")+
+  geom_hline(yintercept = 0.5, lty = 2, size = 1.5)+
+  custom_theme_text_enlarged+
+  facet_wrap(vars(experiment))
+ggsave("//Users//andrescheepers//Desktop//berlin_ICN_poster//exp_comp_lineplot_perf_across_trials.png", plot = last_plot(),
+       width = 10, height = 6.5, dpi =300)
+
+# add binned points to plot
+df_rolling <- choices_test %>%
+  arrange(rank_trial) %>%
+  group_by(individual, experiment) %>%
+  mutate(
+    pcorr = rollmean(decision, k = 3, fill = NA, align = "center")
+  ) %>%
+  # average over individual
+  ungroup() %>% group_by(rank_trial, experiment) %>%
+  summarise(pcorr = mean(pcorr))
+
+p + geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr))
+
+# prettify tables for in-line results
+emmArt <- bind_rows(emmArt) %>%
+  mutate(probFmt = round(prob, 3)) 
+emmArt$confint <- sprintf("[%.3f, %.3f]", emmArt[,"asymp.LCL"], emmArt[,"asymp.UCL"])
+
+emmArt <- emmArt %>%
+  select(experiment, trial_pos, probFmt, confint) %>%
+  pivot_wider(
+    names_from = trial_pos,
+    values_from = c(probFmt, confint),
+    names_glue = "{trial_pos}_{.value}"
+  )
+# rename rows and pivot wide to make indexing easier 
+emmArt <- tibble::column_to_rownames(emmArt, "experiment")
+
+# need to include the trial numbers in final summary df
+```
+
+
+```{r Q2 contrasting artificial stimuli}
+# to compare performance among artificial experiments use something like below: 
+contArt <- emtrends(art_glm, specs = pairwise ~ experiment, var = "rank_trial")
+```
+
+Oblique stripe results:
+
+To answer whether wasps require optic flow information to discriminate patterns we tested whether they could distinguish between oblique stripes oriented at 45 degrees to the right or left of the y-maze arm and the general direction of wasp travel. Wasps had no trouble distinguishing between oblique stripes that presumably produce identical rates of optic flow in the dorsal visual field. Initial performance (at trial 1) was not significantly different from chance (pcorr = `r emmArt["thinOb_150823", "first_probFmt"]`, 95% CI: `r emmArt["thinOb_150823", "first_confint"]`) but rose steeply, reaching `r emmArt["thinOb_150823", "last_probFmt"]` (95% CI: `r emmArt["thinOb_150823", "last_confint"]`) by the end of the experiment (trial 66), which is significantly higher than expected by chance (50%).
+
+Next, we asked whether wasps could discriminate between an opaque and transparent roof, ie. between stimuli that carried little to no pattern information. At the onset of the experiment (trial 1), wasp performance was not significantly different from 50% (\Pcorr = `r emmArt["brightDiff_250725", "first_probFmt"]`, 95% CI: `r emmArt["brightDiff_250725", "first_confint"]`))  but rose with experience and by the end of the experiment (trial 26) was `r emmArt["brightDiff_250725", "last_probFmt"]` (95% CI: `r emmArt["brightDiff_250725", "last_confint"]`). Performance at the end of the experiment is not significantly higher than 50% because of the increased uncertainty in the slope / effect of trials on performance due to the lower number of trials run in this experiment. However, if one uses other metrics or analyses to compare performance to the 50% line, they are significantly different (for example, comparing performance at an intermediate trial or comparing the average performance of the last five trials to the 50% line).
+
+Comparison among different artificial stimuli:
+
+issues: - day is mulitcollinear in thin oblique experiment. It makes the slope of thin oblique appear less steep. This drives the difference in slopes detected between perppara and thin oblique. The issue is, is it real? I'm not confident enough that I ran the experiments in exactly the same way so as to make them comparable. If we remove day from the analysis, would we still find a significant difference in the slopes? Could the difference simply be attributable to slower learning due to the side bias which is clearly evident in the thin oblique experiment (possibly caused because of different pre-testing training regimes). Why even is there a side bias when these wasps had just come off the back of a previous experiment with a thick oblique stripe? was the side bias present at that time? - the issue im trying to get at above is that conclusions regarding slope diffs depend on the model you run. - massive confidence intervals around brightness experiment
+
+# Question 3: Can wasps use naturalistic patterns for navigation? 
+- Are performances different from 50%?
+- Are performances different from the control?
+- Are there differences in performance between naturalistic and artificial stimuli?
+
+```{r Q3 test vs 50}
+
+emmNatTestAllTrials1 <- emmTestAllTrials %>% filter(nat_or_art == "naturalistic")
+emmNatTestPts1 <- emmTestPts %>% filter(nat_or_art == "naturalistic")
+tbNatTestPts1 <- tbTestPts %>% filter(nat_or_art == "naturalistic")
+
+p <- ggplot(emmNatTestAllTrials1, aes(x = rank_trial, y = prob, colour = experiment)) +
+  geom_line() +
+  geom_ribbon(
+    aes(ymin = asymp.LCL, ymax = asymp.UCL, fill = experiment),
+    alpha = 0.15,
+    colour = NA
+  ) +
+  ylim(0, 1) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  facet_wrap(vars(experiment))+
+  ylab("P(correct)")+
+  theme(legend.position = "none")
+
+# i do this several times for each question, also do it once at beginning of script
+df_rolling <- choices %>%
+  filter(manipulation == "test" & nat_or_art == "naturalistic") %>%
+  # arrange dataframe so that rollmean works within individuals,
+  # experimental phases and sideAlt, and across consecutive trials
+  arrange(rank_trial) %>%
+  group_by(individual, experiment) %>%
+  mutate(
+    pcorr = rollmean(decision, k = 3, fill = NA, align = "center")
+  ) %>%
+  # average over individual
+  ungroup() %>% group_by(rank_trial, experiment) %>%
+  summarise(pcorr = mean(pcorr))
+
+p + geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr))
+
+```
+
+Discrimination performance for naturalistic canopies tends to be lower than for artificial canopies (make some sort of comparison or just give ranges) and evidence for whether wasps can discriminate naturalistic canopies at above-chance rates (>50%) is mixed. While \Pcorr was generally lower than for the artificial canopies, in four of the seven naturalistic canopy pairs we tested, the predicted \Pcorr by the end of the experiment was significantly above chance (the lower limit of the 95% CI is > 50%, see Table x), suggesting there may be able to separate certain pairs of naturalistic canopies to some degree (assuming no other information was available to the wasps). 
+
+naturalistic test vs control
+
+```{r Q3 test vs control}
+
+# control comparison: compare the control to the test
+# bring in the predictions across all trials and the subset for end of test and start of control
+emmNatTcAll <- emmTcTrials %>% filter(nat_or_art == "naturalistic")
+emmNatTcPts <- emmTcPts %>% filter(nat_or_art == "naturalistic")
+tbNatTcPts <- dispTcPts %>% filter(nat_or_art == "naturalistic")
+
+expTestAndCtrl <- names(
+  which(
+    tapply(choices$manipulation, choices$experiment,
+           function(x) length(unique(x)) > 1)))
+
+choicesRollTc <- choices_rolling %>%
+  filter(nat_or_art == "naturalistic" & experiment %in% expTestAndCtrl) 
+
+# add the best fit line and CIs to plots
+p <- ggplot(emmNatTcAll, aes(x = rank_trial, y = prob, colour = experiment)) +
+  geom_line() + 
+  geom_ribbon(
+    aes(ymin = asymp.LCL, ymax = asymp.UCL, fill = experiment),
+    alpha = 0.15,
+    colour = NA
+  ) +
+  ylim(0, 1) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  facet_grid(experiment ~ manipulation)+
+  ylab("P(correct)")+
+  theme_grey()+ 
+  theme(legend.position = "none")
+
+p + 
+  geom_point(data = choicesRollTc, aes(x = rank_trial, y = pcorr))+
+  geom_hline(yintercept = 0.5, linetype = "dashed")+
+  facet_grid(experiment ~ manipulation, space = "free", scales = "free_x")
+
+p <- ggplot(emmNatTcPts, aes(x = manipulation, y = prob,
+                               ymin = asymp.LCL, ymax = asymp.UCL)) +
+  geom_point() +
+  geom_errorbar(aes()) +
+  ylim(0, 1) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  facet_wrap(vars(experiment))+
+  ylab("P(correct)")+
+  theme(legend.position = "none")
+
+# can compare the average of the n control trials to the average of the last n test trials 
+# could look at wasps present / days / other variables to 
+# make sure they're somewhat equal between the comparisons
+
+```
+
+Produce necessary tables to report from in-line and to include in MS. 
+
+Write results here:
+Evidence that wasps can discriminate naturalistic canopies from the test vs control analysis is also mixed. 
+
+
+Coming soon: 1. comparison of naturalistic stimuli versus artificial
+
+```{r Q3 old code}
+
+# natTest <- choices %>%
+#     filter(manipulation == "test" & nat_or_art == "naturalistic") %>%
+#     mutate(experiment = as.character(experiment))
+# 
+# modsNatTest <- natTest %>% 
+#   split(.$experiment) %>%
+#   map(~ glmer(
+#     decision ~ rank_trial + sideAlt_trial + reward_side +
+#                (reward_side | individual),
+#                data = .x, family = binomial))
+# 
+# # extract coefficients and confidence intervals
+# results <- map_df(modsNatTest, broom.mixed::tidy, .id = "experiment")
+# 
+# # Get predictions at start and end of experiment
+# emmNatTestAllTrials <- imap_dfr(modsNatTest, function(m, exp_id) {
+#   emmeans(m, ~ rank_trial,
+#           cov.keep = "rank_trial", # gets predictions for every trial rather than covariate avg
+#           type = "response") %>%
+#     as.data.frame() %>%
+#     mutate(experiment = exp_id)
+# })
+# # finding the min and max trial predictions is something I can do in one go earlier in the code. Ive repeated the code multiple times for each section...
+# emmNatTest <- emmNatTest %>% 
+#   group_by(experiment) %>%
+#   filter(rank_trial == max(rank_trial) | 
+#            rank_trial == 1) 
+# 
+# # find the probability at the average trial (mean of unique trials per exp)
+# # you could use the same approach to find the max trials and then one shot emmeans by making a prediction grid with middle and max trials
+# meanTrial <- sapply(
+#   split(natTest$rank_trial, natTest$experiment),
+#   function(x) mean(unique(x), na.rm = TRUE)
+# )
+# # below does same job as above base r code
+# # meanTrial <- natTest %>%
+# #   group_by(experiment) %>%
+# #   summarise(
+# #     rank_trial = mean(unique(rank_trial), na.rm = TRUE),
+# #     .groups = "drop"
+# #   )
+# 
+# predsMeanTrial <- map2(
+#   .x = modsNatTest, .y = names(modsNatTest),
+#   function(m, exp_id) {
+#     
+#   mt <- meanTrial[[exp_id]]
+# 
+#   emmeans(m, ~ 1,
+#           at = list(rank_trial = mt), type = "response") %>%
+#     as.data.frame() %>%
+#     mutate(
+#       experiment = exp_id,
+#       rank_trial = mt,
+#     ) %>% 
+#     select(-`1`)
+#   
+# })
+# predsMeanTrial <- list_rbind(predsMeanTrial)
+# 
+# # bind predictions into common table and prettify for indexing
+# predTable <- rbind(predsMeanTrial, emmNatTest) %>%
+#   # add a 'trial pos' variable that will make indexing table easier:
+#   group_by(experiment) %>%
+#   mutate(
+#     trial_pos = case_when(
+#       rank_trial == 1 ~ "start",
+#       rank_trial == max(rank_trial, na.rm = TRUE) ~ "end",
+#       rank_trial > 1 & rank_trial < max(rank_trial, na.rm = TRUE) ~ "middle"),
+#     probConfint = sprintf("%.3f [%.3f, %.3f]", prob, asymp.LCL, asymp.UCL)
+#     ) %>%
+#   # pivot the data wider to allow for easy indexing of table
+#   select(experiment, rank_trial, probConfint, trial_pos) %>%
+#   pivot_wider(names_from = trial_pos,
+#               values_from = c(probConfint, rank_trial)) 
+# 
+
+
+
+```
+
+Q3 test vs control old code. redundant , can be thrown away
+```{r}
+# # Compare test and control the glm way. 
+# # make model. Day as random effect bc running as fixed causes problems with one level
+# mTestVsCtrl <- natCtrl %>%
+#   split(.$experiment) %>%
+#   map(~ glmer(decision ~ manipulation * rank_trial +
+#                 (1 | day) + 
+#                 (1 | individual),
+#                data = .x, family = binomial))
+# 
+# # find the end points of test and the start points of control for comparison with emmeans
+# trial_points <- natCtrl %>%
+#   group_by(experiment, manipulation) %>%
+#   summarise(
+#     min_trial = min(rank_trial, na.rm = TRUE),
+#     max_trial = max(rank_trial, na.rm = TRUE)
+#   ) %>%
+#   summarise(
+#     control_start = min_trial[manipulation == "control"],
+#     test_end      = max_trial[manipulation == "test"]
+#   )
+# 
+# # all im trying to do is compare end of test and start of control...
+# emmTestVsCtrl <- imap_dfr(mTestVsCtrl, function(m, exp_id) {
+# 
+#   pts <- trial_points %>% filter(experiment == exp_id)
+# 
+#   t_start <- pts$control_start
+#   t_end   <- pts$test_end
+# 
+#   emmeans(m, ~ manipulation * rank_trial,
+#     at = list(rank_trial = c(t_start, t_end)),
+#     type = "response") %>%
+#     as.data.frame() %>%
+#     filter(! manipulation == "control" & rank_trial > 2 |  
+#            ! manipulation == "test" & rank_trial == 1) %>%
+#     mutate(experiment = exp_id)
+#   
+# })
+
+```
+
+Misc code that can likely be thrown away:
+
+```{r}
+
+# Plotting the results with correct column names
+# ggplot(emm_df, aes(x = experiment, y = prob,
+#                    fill = experiment, color = experiment))+
+#   geom_point(stat = "identity", shape = 21,
+#              position = position_dodge(width = 0.9),
+#              color = "black", size = 4.5, stroke = 1.5)+
+#   geom_errorbar(aes(ymin = prob - SE, ymax = prob + SE),
+#                 width = 0.2, position = position_dodge(width = 0.9)) +
+#   geom_text(data = cld_df,
+#             aes(x = experiment, y = prob + 0.07, label = .group),
+#             color = "black", size = 10,
+#             position = position_dodge2(width = 1, padding = 100)) +
+#   labs(x = "Stimulus pair",
+#        y = "Predicted % choices for reward")+
+#   geom_hline(yintercept = 0.5, lty = 2, size = 1.5)+
+#   #scale_fill_brewer(type = "qual", palette = "Set3")+
+#   scale_fill_viridis_d()+
+#   scale_color_viridis_d()+
+#   scale_y_continuous(labels=scales::percent)+
+#   scale_x_discrete(
+#     limits = c("nat_can", "perp_para", "thin_oblique", "thick_oblique"),
+#     labels = c("Naturalistic", "0, 90", "thin +45, -45", "thick +45, -45"))+
+#   custom_theme_text_enlarged+
+#   theme(legend.position = "none",
+#         #panel.border = element_rect(
+#         #linetype = "solid", colour = "black", size=5, fill = NA),
+#         axis.line = element_line(colour = 'black', size = 1.5),
+#         axis.ticks = element_line(colour = "black", size = 1.5),
+#         axis.ticks.length=unit(.3, "cm"),
+#         plot.margin = margin(15,1,5,1),
+#         axis.text.x = element_text(angle = 20, size = 20, vjust = 0.9, hjust = 0.8),
+#         #axis.ticks.x=element_blank()
+#   )
+# ggsave(
+#   "//Users//andrescheepers//Desktop//berlin_ICN_poster//exp_comp_barplot_perf_across_experiments_after_46_trials.png",
+#   plot = last_plot(),
+#   width = 9, height = 6.5, dpi =300)
+
+```

@@ -1,0 +1,578 @@
+---
+title: "data_analysis_2023"
+author: "drdre"
+date: '2023-08-17'
+output: html_document
+---
+
+```{r}
+rm(list = ls())
+source("scripts//loading_cleaning.R")
+source("scripts//custom_themes_and_colour_palettes.R")
+
+# removing data that isn't relevant to the main analysis
+library(magrittr)
+choices %<>% filter(
+  ! experiment %in% c("thick_oblique_apis", "thickOb_140823", "thickObDiff_210924",
+                      "perpPara_240723", "perpParaPostNatcan_090925"))
+
+```
+
+Binning by trial number (experience) rather than 1st or last. better perhaps.
+To do:
+- where is control trials going in below code? make sure control data is separate
+```{r}
+# Assigning trials to bins and ordering data ####
+bin_trials <- function(
+    data, bin_size = 15,
+    group_vars = c("individual", "experiment", "manipulation")) {
+  data %>%
+    # all_of throws error if grouping col not found. across allows for 'dynamic eval' of group vars
+    group_by(across(all_of(group_vars))) %>%  
+    mutate(
+      trial_bin = ceiling(rank_trial / bin_size),
+      trial_range = paste0((trial_bin - 1) * bin_size + 1, "-", trial_bin * bin_size)
+    ) %>%
+    ungroup()
+}
+
+choices <- bin_trials(choices)
+
+# Ensure trial ranges are in sequential order
+choices %<>%
+  mutate(trial_range = factor(trial_range, levels = unique(trial_range[order(trial_bin)])))
+
+# Calculating prop correct and CIs of bins and ordering ####
+source("functions//calc_cis.R")
+proportion_data <- calc_cis(
+  choices, group_vars = c("experiment", "manipulation", "trial_range"))
+
+```
+
+Plotting
+```{r}
+# could change this variable to "stimulus" with values of either "present" or "absent"
+proportion_data$manipulation <- factor(
+  proportion_data$manipulation, levels = c('test', 'control'))
+
+# TO DO: I think I should remove below code, doesn't seem right to remove bins with low n?
+# # define different data subsets
+# proportion_data <- proportion_data %>% 
+#   # removing bins that have low sample size
+#   filter(total > 10) 
+
+# only looking at 'test' data (not control)
+proportion_data_test <- proportion_data %>% filter(manipulation == "test") 
+
+source("functions/plot_generating_functions.R")
+# make a colour variable that higlights certain experiments / stimuli
+# eg. here I want to highlight perp_para vs perp para 2025 and also compare them
+# to other artificial stimuli, but not the naturalistic ones
+
+p <- generate_plot(proportion_data_test)
+ggsave("plots//perf_bin_by_bin_for_each_experiment.png",
+        plot = last_plot(), width = 8, height = 6, dpi = 300)
+
+# comparing naturalistic canopies to artificial
+# bring in the "nat_or_art" column from choices df
+nat_or_art <- unique(choices[, c("experiment", "nat_or_art")])
+proportion_data_test <- left_join(proportion_data_test, nat_or_art,
+                                  by = "experiment", keep = F)
+
+alph <- numeric(length = length(unique(proportion_data_test$experiment)))
+alph[] <- 0.5
+
+```
+
+comparing naturalistic and artificial canopies
+```{r}
+
+proportion_data_test %>% 
+  ggplot(aes(x = trial_range, y = mean, group = experiment,
+             colour = nat_or_art, alpha = experiment))+
+  geom_point(size = 3, position = position_dodge(width = 0.3))+
+  geom_line(position = position_dodge(width = 0.3))+
+  geom_hline(lty = 2, yintercept = 0.5)+
+  geom_errorbar(aes(ymin = lower, ymax = upper),
+                position = position_dodge(width = 0.3),
+                width = 0.2)+
+  scale_alpha_manual(values = alph)+
+    scale_y_continuous(labels = scales::percent)+
+    labs(y = "% choices for reward in trial bin",
+         x = "Trial bin")+
+  facet_grid(cols = vars(manipulation), scales = "free_x", space = "free")+
+  theme_classic()+
+  theme(legend.position = "none")
+ggsave("plots//naturalistic_vs_artificial//nat_vs_art_across_trial_ranges.png",
+        plot = last_plot(), width = 6, height = 6, dpi = 300)
+
+
+```
+
+```{r}
+
+# look at data per individual within an experiment
+# 1. across the whole experiment
+# 2. within trial bins at different stages of the experiment
+
+# first, need to get proportion data per individual.
+# quick improvements : 
+# why dont error bars and points overlap
+ind_props <- calc_cis(
+  choices, group_vars = c("indiv_code", "experiment", "manipulation",
+                          "trial_range", "stimuli"))
+
+ind_props %>% filter(experiment == "natcan_2025",
+                     ! indiv_code %in% c("NA_55", "NA_54", "NA_52", "NA_44")) %>%
+  plot_ind_perf_across_trials()
+  
+ind_props %>%
+  filter(experiment == "natcan_3D_2025",
+         # filter out individuals that weren't present for much of the experiment (perhaps a bit aggressive here? 23 was around for about half of experiment)
+         ! indiv_code %in% c("NA_55", "NA_15", "NA_23")) %>% 
+  plot_ind_perf_across_trials()
+
+# check prop correct across all trials and / or from trial 30-60
+ind_props <- calc_cis(
+  choices, group_vars = c("indiv_code", "experiment", "manipulation", "stimuli"))
+
+ind_props %>% filter(experiment == "natcan_2025",
+                     ! indiv_code %in% c("NA_55", "NA_54", "NA_52", "NA_44")) %>%
+  plot_ind_perf_over_exp()
+
+ind_props %>% filter(experiment == "natcan_3D_2025",
+                     ! indiv_code %in% c("NA_55", "NA_15", "NA_23")) %>%
+  plot_ind_perf_over_exp()
+
+# next steps: 
+# look at side biases of individuals
+# how do i compartmentalize this individuals analysis? separate analysis script?
+# or do we analyze all the indivs within the different experiments in this script?
+
+
+```
+
+Comparing performance among different stimuli in particular subsets (bins by trial) of data
+Chi sq hypothesis testing and pairwise prop tests for different bins of decisions
+```{r}
+
+# reorder experiment groups from highest prop correct to lowest
+subset_df <- choices[choices$manipulation == "test", ]
+group_order <- with(subset_df, tapply(as.numeric(decision), stimuli, mean))
+group_order <- names(sort(group_order, decreasing = TRUE))
+# Reorder group levels based on calculated proportions
+choices$stimuli <- factor(choices$stimuli, levels = group_order)
+rm(subset_df, group_order)
+
+# desired comparisons
+choices_subset <- choices %>%
+  #select(-c(9:13)) %>% # why these were dropped im not sure
+  filter(manipulation == "test" &
+           stimuli %in% c("natcan", 'perp_para',
+                          "thin_oblique", "thick_oblique")) %>%
+  # combine the relevant bins and create new variable
+  mutate(bin_group = case_when(
+    trial_bin %in% c(1,2,3) ~ "123",
+    #trial_bin %in% c(3,4,5) ~ "345", # why are the bins (123 and 345) overlapping?
+    #trial_bin %in% c(6,7,8,9) ~ "6789",
+    TRUE ~ "rest")) %>%
+  filter(bin_group == "123") 
+
+subset_estimates <- calc_cis(choices_subset, c("stimuli", "bin_group"))
+
+generate_plot_2 <- function(data){
+  # removing thick oblique from the 345 bin, very few obs anyway. 
+  #filter(! (bin_group == "345" & experiment == "thick_oblique") ) %>% 
+ggplot(data, aes(x = stimuli, y = mean, color = stimuli, group = stimuli))+
+    geom_point(position = position_dodge(width = 0.3), size = 4)+
+    geom_errorbar(aes(ymin = lower, ymax = upper),
+                position = position_dodge(width = 0.3), width = 0.2)+
+    geom_hline(lty = 2, yintercept = 0.5)+
+    geom_text(aes(y =0.4, label = paste0("(", wasp_n, ", ", total,")")), 
+            show.legend = FALSE)+
+    stim_colour_scale+
+    scale_y_continuous(labels = scales::percent)+
+    scale_x_discrete(labels = experiment_labels)+
+    labs(y = "% of choices for reward",
+       x = "stimuli")+
+    custom_theme_no_x_grid+
+    theme(legend.position = "none")#+
+  #facet_wrap(facets = "bin_group", scales = "free_x", nrow = 1)
+}
+
+p <- generate_plot_2(subset_estimates)
+ ggsave("plots//perf_across_stimuli_first45_trials.png",
+        plot = last_plot(), width = 4, height = 4, dpi = 300)
+
+# pairwise prop and chi sq tests
+#bin123 <- choices %>% filter(manipulation == "test", trial_bin %in% c(1,2,3)) 
+bin123 <- table(choices_subset$stimuli, choices_subset$decision,
+                exclude = "thick_oblique_apis")
+
+source("functions//pw_prop_test_df_out.R")
+chisq.test(bin123)
+pw_results_bin123 <- pw_prop_test_df_out(bin123, p_adjust_method = "holm")
+
+```
+
+Do dorsal stimuli provide snapshot information? Comparing test props / perf to controls\
+and to the 50% line
+```{r}
+
+test_vs_ctrl <- calc_cis(choices, group_vars = c("stimuli", "manipulation")) 
+test_vs_ctrl$manipulation <- fct_relevel(test_vs_ctrl$manipulation, "test")
+
+generate_plot_2(test_vs_ctrl)+facet_grid(cols = vars(manipulation))
+
+all_bins <- table(choices$manipulation, choices$decision, choices$stimuli)
+#                exclude = "thick_oblique_apis")
+ggplot(test_vs_ctrl, aes(x = manipulation, y = mean, color = manipulation)) +
+  geom_point(position = position_dodge(width = 0.6), size = 3) +
+  geom_errorbar(aes(ymin = lower, ymax = upper),
+                position = position_dodge(width = 0.6), width = 0.2)+
+  geom_hline(lty = 2, yintercept = 0.5)+
+  scale_y_continuous(labels = scales::percent)+
+  labs(x = "Stimuli and experiment phase", y = "% of choices for reward", color = "experiment phase")+
+  facet_grid(cols = vars(stimuli), scales = "free_x", 
+             labeller = as_labeller(experiment_labels))+
+  custom_theme_no_x_grid
+ ggsave("plots//perf_test_vs_control_all_trials2.png",
+        plot = last_plot(), width = 7, height = 4, dpi = 300)
+
+test_vs_control_results <- apply(all_bins, 3, prop.test)
+
+test_vs_control_results <- do.call(
+  rbind, lapply(test_vs_control_results, function(res) {
+    data.frame(
+      p_value = res$p.value,
+      estimate_diff = res$estimate[1] - res$estimate[2],
+      conf_low = res$conf.int[1],
+      conf_high = res$conf.int[2]
+    )
+}))
+
+test_vs_control_results$p_value <- p.adjust(
+  test_vs_control_results$p_value, method = "holm")
+
+test_vs_control_results$comparison <- paste0(rownames(test_vs_control_results),
+                                             " test vs control")
+
+# test vs chance 50% line
+all_bins <- table(choices$stimuli, choices$decision, choices$manipulation)
+x <- all_bins[,"1","test"]
+n <- apply(all_bins[,,"test"], 1, sum)
+
+results <- mapply(function(success, total) {
+  prop.test(success, total)
+}, x, n, SIMPLIFY = FALSE)
+
+test_vs_50pcent_results <- do.call(
+  rbind, lapply(results, function(res) {
+    data.frame(
+      p_value = res$p.value,
+      estimate = res$estimate,
+      conf_low = res$conf.int[1],
+      conf_high = res$conf.int[2]
+    ) %>%
+      mutate(
+        across(c(estimate, conf_low, conf_high),
+               ~ . - 0.5, .names = "{.col}_50pcent")
+  )
+}))
+
+test_vs_50pcent_results$p_value <- p.adjust(
+  test_vs_50pcent_results$p_value, method = "holm")
+
+test_vs_50pcent_results$comparison <- paste0(rownames(test_vs_50pcent_results),
+                                             " test vs control")
+
+```
+
+Table formatting
+```{r}
+#library(gt)
+library(sjPlot)
+
+format_p_values <- function(p) {
+  ifelse(p < 0.001, "<0.001",  formatC(p, format = "f", digits = 3))
+}
+# text substitutions:
+text_subs <- c("diff" = "diffuser", "natcan" = "naturalistic canopy",
+               "perp_para" = "perpendicular-parallel", "_" = " ")
+pw_results_bin123 <- pw_results_bin123 %>%
+  mutate(
+    groups = str_replace_all(groups, text_subs),
+  # convert diffs in prop to diffs in %
+    across(c(estimate_diff, conf_low, conf_high), ~ round(.x, 3)),
+    across(c(estimate_diff, conf_low, conf_high), ~ .x *100),
+    `95 % confidence interval` = paste0("[", conf_low, "; ", conf_high, "]"),
+    p_value = format_p_values(p_value)
+  ) %>%
+  select(-conf_low, -conf_high) 
+
+# rename table headings
+pw_results_bin123 <- pw_results_bin123 %>%
+   rename(`stimuli compared` = groups,
+          `p value` = p_value,
+           `difference in % correct choices (group 1 - group 2)`= estimate_diff)
+sjPlot::tab_df(pw_results_bin123,
+               file = "tables//pw_prop_test_results_trial_0_to_45.html")
+
+# convert the str replace instances above to a mapping that can be reused for this table.
+# consider moving all table formatting to a new script.
+test_vs_control_results <- test_vs_control_results %>%
+    mutate(
+      comparison = str_replace_all(comparison, text_subs),
+      across(c(estimate_diff, conf_low, conf_high), ~ round(.x, 3)),
+      across(c(estimate_diff, conf_low, conf_high), ~ .x *100),
+      `95 % confidence interval` = paste0("[", conf_low, "; ", conf_high, "]"),
+      p_value = format_p_values(p_value)
+  ) %>%
+  select(-conf_low, -conf_high) %>%
+  relocate(comparison, .before = everything())
+sjPlot::tab_df(test_vs_control_results,
+               file = "tables//test_vs_control_results.html")
+
+# convert the str replace instances above to a mapping that can be reused for this table.
+# consider moving all table formatting to a new script.
+test_vs_50pcent_results <- test_vs_50pcent_results %>%
+    mutate(
+      p_value = format_p_values(p_value),
+      comparison = str_replace_all(comparison, text_subs),
+      across(matches("estimate|conf_low|conf_high"), ~ round(.x, 3)),
+      across(matches("estimate|conf_low|conf_high"), ~ .x *100),
+      `95 % confidence interval` = paste0("[", conf_low, "; ", conf_high, "]"),
+      `95 % confidence interval of difference` =
+        paste0("[", conf_low_50pcent, "; ", conf_high_50pcent, "]")
+  ) %>%
+  select(-conf_low, -conf_high, -conf_low_50pcent, -conf_high_50pcent) %>%
+  relocate(comparison, .before = everything())
+sjPlot::tab_df(test_vs_50pcent_results,
+               file = "tables//test_vs_50pcent_results.html")
+
+```
+
+Looking at the effect of day on choices
+would be nice if this effect could be visualized in the same plot as the main one above
+```{r, eval=FALSE}
+# we group by day as well so trial bins start anew each day
+choices <- bin_trials(
+  choices, bin_size = 10, 
+  group_vars = c("individual", "experiment", "manipulation", "day"))
+
+# need to run this code again (put in function?) to recalculate conf.ints etc.
+# Calculating prop correct and CIs of bins and ordering ####
+proportion_data <- choices %>%
+  group_by(experiment, manipulation, trial_bin, trial_range,
+           day) %>% # must also group by day in order to keep the variable
+  summarise(
+    wasp_n = n_distinct(individual),
+    count_1 = sum(decision == 1),
+    count_0 = sum(decision == 0),
+    total = sum(count_1, count_0)) %>%
+  rowwise() %>%
+  mutate(tst = list(binom::binom.confint(count_1, total, method = "wilson"))) %>%
+  unnest(tst) %>%
+  ungroup()
+
+# define different data subsets
+proportion_data <- proportion_data %>% 
+  filter(decision == "1", total > 5) # removing bins that have low sample size
+proportion_data_test <- proportion_data %>% 
+  filter(manipulation == "test") # only looking at so-called 'test' data
+
+p2 <- generate_plot(proportion_data_test, same_axis = T)
+p2+facet_wrap(vars(day), nrow = 1, scales = "free_x")
+
+x <- proportion_data_test %>% 
+  filter(experiment == "thick_oblique_diff" & day == "3")
+x <- choices %>% 
+  filter(experiment == "thick_oblique_diff" & day == "3")
+
+
+```
+
+logistic regression of performance across trials 
+```{r, eval=F}
+
+# I only want to compare the curves of thick +-45 vs thin +-45 vs 0 / 90 during TESTING types
+# to do that I'll make a new variable where control is excluded from thin_oblique testing
+
+choices_test <- choices[choices$experiment_type != 'control',]
+# run log reg and plot again:
+fit <- glm(first ~ rank_trial * factor(experiment), data = choices_test, family = binomial)
+summary(fit)
+choices_test$predicted_probabilities <- predict(fit, type = "response")
+
+comp_points <- choices_test %>% filter(rank_trial == "46") 
+
+ggplot(data = choices_test, 
+       aes(x = rank_trial, y = predicted_probabilities,
+           color = as.factor(experiment), fill = as.factor(experiment)))+
+  geom_smooth(method = "glm", method.args = list(family = binomial), alpha = 0.5)+
+  geom_point(data = comp_points,
+             aes(x = rank_trial, y = predicted_probabilities),
+             size = 4.5, stroke = 1.5, shape = 21, color = "black")+
+  labs(x = "Trial", y = "% of decisions for reward")+
+  scale_y_continuous(labels = scales::percent)+
+  scale_colour_viridis_d()+
+  scale_fill_viridis_d()+
+  scale_x_continuous(breaks = c(0,46,50, 100), labels =  c("0","", "50", "100"))+
+  #  scale_color_brewer(type = "qual", palette = "Set3")+
+  geom_hline(yintercept = 0.5, lty = 2, size = 1.5)+
+  custom_theme_text_enlarged+
+  theme(legend.position = "none",
+        #panel.border = element_rect(
+        #linetype = "solid", colour = "black", size=5, fill = NA),
+        axis.line = element_line(colour = 'black', size = 1.5),
+        axis.ticks = element_line(colour = "black", size = 1.5),
+        axis.ticks.length=unit(.3, "cm"),
+        plot.margin = margin(15,1,5,1),
+        #axis.text.x=element_blank(),
+        #axis.ticks.x=element_blank()
+        )
+ggsave("//Users//andrescheepers//Desktop//berlin_ICN_poster//exp_comp_lineplot_perf_across_trials.png", plot = last_plot(),
+       width = 10, height = 6.5, dpi =300)
+# How do we interpret these stats?
+# ggsave("figures//optflow_log_reg_thin_oblique.png", plot = last_plot(), width = 5, height = 3, dpi = 300)
+
+# comparing means of groups at a particular value of trial number:
+# Load necessary libraries
+library(emmeans)
+library(multcomp)
+library(multcompView)
+
+# Fit the logistic regression model with interaction
+model <- glm(first ~ experiment * rank_trial, data = choices_test, family = binomial)
+summary(model)
+
+# Calculate adjusted predicted probabilities for a specific value of the covariate (e.g., the mean value)
+max_covariate_thick_obl <- max(choices_test[choices_test$experiment == "thick_oblique",]$rank_trial)
+emm <- emmeans(model, ~ experiment | rank_trial,
+               at = list(rank_trial = max_covariate_thick_obl), type = "response")
+print(emm)
+plot(emm, comparisons = TRUE)
+
+# Perform pairwise comparisons
+pairs <- pairs(emm, adjust = "tukey")
+print(pairs)
+
+# Get compact letter display for significant differences
+cld <- cld(emm, adjust = "tukey", Letters = letters, type = "response")
+print(cld)
+
+# Convert results to data frames
+emm_df <- as.data.frame(emm)
+cld_df <- as.data.frame(cld)
+
+# Inspect the structure of the data frames to identify correct column names
+str(emm_df)
+str(cld_df)
+
+
+# Plotting the results with correct column names
+ggplot(emm_df, aes(x = experiment, y = prob,
+                   fill = experiment, color = experiment))+
+  geom_point(stat = "identity", shape = 21,
+             position = position_dodge(width = 0.9),
+           color = "black", size = 4.5, stroke = 1.5)+
+  geom_errorbar(aes(ymin = prob - SE, ymax = prob + SE),
+                width = 0.2, position = position_dodge(width = 0.9)) +
+  geom_text(data = cld_df,
+            aes(x = experiment, y = prob + 0.07, label = .group),
+            color = "black", size = 10,
+            position = position_dodge2(width = 1, padding = 100)) +
+  labs(x = "Stimulus pair",
+       y = "Predicted % choices for reward")+
+  geom_hline(yintercept = 0.5, lty = 2, size = 1.5)+
+  #scale_fill_brewer(type = "qual", palette = "Set3")+
+  scale_fill_viridis_d()+
+  scale_color_viridis_d()+
+  scale_y_continuous(labels=scales::percent)+
+  scale_x_discrete(
+  limits = c("nat_can", "perp_para", "thin_oblique", "thick_oblique"),
+  labels = c("Naturalistic", "0, 90", "thin +45, -45", "thick +45, -45"))+
+  custom_theme_text_enlarged+
+    theme(legend.position = "none",
+        #panel.border = element_rect(
+          #linetype = "solid", colour = "black", size=5, fill = NA),
+        axis.line = element_line(colour = 'black', size = 1.5),
+        axis.ticks = element_line(colour = "black", size = 1.5),
+        axis.ticks.length=unit(.3, "cm"),
+        plot.margin = margin(15,1,5,1),
+        axis.text.x = element_text(angle = 20, size = 20, vjust = 0.9, hjust = 0.8),
+        #axis.ticks.x=element_blank()
+        )
+ggsave(
+  "//Users//andrescheepers//Desktop//berlin_ICN_poster//exp_comp_barplot_perf_across_experiments_after_46_trials.png",
+       plot = last_plot(),
+       width = 9, height = 6.5, dpi =300)
+
+```
+
+```{r}
+
+test_vs_50pcent_results[1,6]
+pw_results_bin123[pw_results_bin123$`stimuli compared` == "thin oblique vs perpendicular-parallel",]
+pw_results_bin123[,1]
+
+
+```
+
+Results manuscript write up: 
+question 1: Can wasps use dorsal landmark information? And can they use 'naturalistic canopies' ?
+
+For all stimuli-pairs tested, the percentage of correct choices were significantly greater 
+than the level that would be expected by chance, ie. greater than 50% (table x, figure x). The percentage correct decisions are estimated to be between `r test_vs_50pcent_results[1,6]` % greater than chance for the thick oblique stimuli and between `r test_vs_50pcent_results[4,6]` 
+% greater for the perpendicular-parallel stimuli (table x, figure x). 
+
+The percentage of correct decisions are also significantly higher `r test_vs_50pcent_results[3,6]` than 50% for the naturalistic canopy stimuli.
+
+The percentage of correct choices was also consistently higher in the testing phase of experiments relative to the control phases (range ?), although this difference was not significant for all stimuli / experiments (Table x, Figure x). Estimates of the magnitude of the difference in the percentage of correct decisions between test and control phases ranged from `r test_vs_control_results[1,4]` % for the thick oblique stimuli to `r test_vs_control_results[1,4]` for the perpendicular-parallel stimuli. Additionally, while confidence intervals around the percentage of correct choices were frequently large in the controls (given lower number of control trials relative to the test phase), the actual observed percentages of correct choices in the data were consistently near 50% across all experiments (range??). 
+
+Question 2: Are there differences in the performance among stimuli? 
+- Specifically, are there differences in performance between the thin oblique stripes and
+the parallel-perpendicular stimuli?
+
+However, differences in performance among the stimuli were detectable over the first 45 trials (table x, figure x). The performance of wasps in the presence of the thick oblique stimuli over the first 45 trials was higher than for the other stimulus pairs (range of differences, p-values), though this is unlikely to hold if one compares the performance with the thick oblique stimuli to performance with other stimuli in later trials (Figure x).
+
+The percentage of choices that were correct for the perp-parallel stimuli over the first 45 trials were lower than for the thin (this distinction might actually be needed) oblique stimuli (estimated difference in % correct choice = `r pw_results_bin123[5, 4]`), though this difference was not significant after correction for multiple testing (table, figure, p value).
+
+However, the larger proportion correct for the thin oblique stimuli might not hold if 
+performance is compared to perpendicular parallel in later trials (Figure x). (could
+also use a logistic regression comparison here, look at ICN Berlin plot and code).
+
+Only performance in the presence of the naturalistic canopy stimuli appear to remain low across all trials. While there appear to be differences in the duration required to reach a high performance (ie. differences in slope or effect of experience on performance between stimuli), all stimuli reach reasonably high levels of performance (>70%) except for naturalistic canopy stimuli.
+
+Discussion points:
+- comparing stimuli at peak even though there are diff numbers of trials.
+- perp parallel eventually reaches same peak as thin oblique (though with much lower conf),
+but why does it take much longer? is this the idiosyncracy of a single individual? But low indiv sample size wouldnt explain why it takes so long to peak in initial phase of experiment. Perhaps 
+this experiment needs to be redone, as experimental differences in training or testing phases might explain.
+
+## Things to think about
+
+What is the effect of the blocking I've been doing? I haven't had a very firm or consistant rule about blocking except that I do it after an individual makes consistant mistakes in one direction and appears to have a side bias. I think its important to think about because its a very effective way to teach the wasp or to accelerate its learning. I use blocking with the intention of showing the wasp that it can turn the other direction and still receive the reward. I believe that insects might need to learn to override a consistant motor command, or perhaps to learn that varying the motor commands is more effective (more rewarding) than using one motor command exclusively. I think that the wasp might need to be shown that two paths exist and that one path always contains the reward. If the wasp is not shown this, then all it knows is that it is receiving rewards in a somewhat idiosyncratic way. Perhaps the wasp does 'notice' that the pattern overhead signifies the presence of reward or the lack thereof. But it surely doesn't know that the reward exists in the other arm when it is not present in this arm. How could it? Unless it has some in-built mechanism that informs steering commands when a snapshot is not matched. This makes me wonder, what happens if you just have one arm and change the patterns and reward? Will the wasp ever learn to turn around, or increase its turning around over time? Or can this only happen when the wasp also learns that there is another location to turn around and go to?
+
+If the wasp learns that there are two locations, does this heighten its sensitivity to the differences in the two dorsal patterns? I'm wondering if when there is only one arm / location the wasp is less sensitive to changes in the pattern because these changes can and do happen in nature.
+
+-   I should account for side bias in my analyses. One effect of side bias in combination with an unequal number of trials will be an over / underestimate of decision accuracy. How can I account for too many trials on one side? I need to weight the trials from each side equally...
+
+-   there are important decisions to make around which individuals to include seeing as some came into experiments at different times and may have had side preferences for longer. Im thinking #31 from recent experiments where I had too many individuals to give it proper attention and eradicate its side preference rapidly. One solution may be to analyze results with different subsets of individuals and to see whether it affects inferences.
+
+-   I wonder if its not just the accuracy of first decisions that changes when you chang from patterns to no patterns but also the total number of incorrect decisions? ie do they go the same, wrong way a lot more when no patterns in? What does this mean?
+
+-   humans can probably learn thousands of faces, insects can probably learn thousands of snapshots. can I learn anything from the human face recognition literature?
+
+-   i wouldnt jump to the conclusion that many thin stripes is more difficult than thick stripes just from this data because thick stripes had a training session not included in the data, which could bias the proportion correct upwards.
+
+-   is it really true that insects get better across trials? or is this just an effect of averaging across insects and rather there is a distinct moment that each insect 'gets it'? Would an interaction between trial and individual perhaps account for this? I haven't thought much about what the different models would be testing.
+
+TO DO: 0. enter data and plot previous experiments. particularly interested in seeing the first control. make note of the fact that training procedures have changed... 1. make tile plot for the cohort across thick stripe, multi small stripe and control. would be nice to annotate the onset of different days and experiments.
+
+INF. revisit logistic regression basics to understand the stats.
+
+INF. visualize proportion correct of thick stripe, mulitple small stripes, and control. next, think about logistic regression and learning rates.
+
+INF. change name of 'choices' to reflect the experiment. eg. angled is a better name. If i'm still separating datasets by experiment.
+

@@ -3,55 +3,57 @@
 # easier to follow by removing all the verbose code needed to generate and 
 # (especially) fine-tune figures.
 
-generate_plot <- function(data, same_axis = F) {
-  # below ensures Ntrial / Nwasp text doesnt overlap when diff exps plotted on same axis
-  if(same_axis == T) {
-    data <- data %>%
-      group_by(experiment) %>%
-      mutate(
-        n_wasp_offset = 0.45 - 0.03 * as.numeric(as.factor(experiment)),
-        #n_trial_offset = 0.35 - 0.015 * as.numeric(as.factor(experiment))
-      ) %>%
-      ungroup()
-  } else {
-    n_wasp_offset = 0.45
-    n_trial_offset = 0.4
-  }
+# Define custom theme (outside function)
+custom_theme_experiment <- 
+  custom_theme_no_x_grid +
+  theme(
+    legend.title = element_blank(),
+    legend.text = element_text(size = 12),
+    legend.position = "top",
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 14)
+  )
+
+# Control which experiments are visible and their colors
+
+# experiment_colors = c(
+#       "perpPara_170725" = "#1F78B4",
+#       "thinOb_150823" = "black",
+#       "natcan1_170923" = "black",
+#       "natcan2_300725" = "black",
+#       "natcan3_080825" = "black",
+#       "brightDiff_250725" = "black"
+#       )
+# 
+# alpha_values = c(
+#       "perpPara_170725" = 1,   
+#       "thinOb_150823" = 0.3,   
+#       "natcan1_170923" = 0,          
+#       "natcan2_300725" = 0,
+#       "natcan3_080825" = 0,
+#       "brightDiff_250725" = 0,
+#       "natcan4_180825" = 0,
+#       "natcan5_290825" = 0 
+#       )
+
+alph <- 0.3
+generate_plot <- function(data) {
   ggplot(data, aes(
     x = as.factor(trial_range),
-    y = mean, 
-    color = perp_para_vs_other_stimuli,
-    alpha = alpha_val,
+    y = mean,
+    color = experiment,
     group = experiment))+
-    geom_point(position = position_dodge(width = 0.3), size = 3)+
-    geom_line(position = position_dodge(width = 0.3), size = 1)+
-    geom_errorbar(aes(ymin = lower, ymax = upper),
-                  position = position_dodge(width = 0.3),
-                  width = 0.2)+
+    geom_point(position = position_dodge(width = 0.3), size = 3, alpha = alph)+
+    geom_line(position = position_dodge(width = 0.3), size = 1, alpha = alph)+
+    geom_errorbar(aes(ymin = lower, ymax = upper), alpha = alph,
+                  position = position_dodge(width = 0.3), width = 0.2)+
     geom_hline(lty = 2, yintercept = 0.5)+
-    scale_alpha_identity()+
-    # geom_text(aes(label = paste0("(", wasp_n, ", ", total,")"),
-    #               y = n_wasp_offset), show.legend = FALSE)+
-    #geom_text(aes(label = paste("Nt =", total), y = n_trial_offset))+
-    #scale_color_viridis_d(labels = experiment_labels) +
-    #stim_colour_scale+
-    # scale_alpha_manual(values = c("natcan" = 1,
-    #                               "thick_oblique" = 0.3,
-    #                               "thin_oblique" = 0.3,
-    #                               "perp_para" = 0.3),
-    #                    guide = "none") +  # Set transparency per level
+    # scale_color_manual(values = experiment_colors)+
+    # scale_alpha_manual(values = alpha_values)+
     scale_y_continuous(labels = scales::percent)+
     labs(y = "% choices for reward in trial bin",
          x = "Trial")+
-    custom_theme_no_x_grid+
-    theme(
-      legend.title = element_blank(),
-      legend.text = element_text(size = 12),
-      axis.text.x = element_text(size = 12),
-      axis.text.y = element_text(size = 12),
-      axis.title.x = element_text(size = 14),
-      axis.title.y = element_text(size = 14),
-      legend.position = "top")
+    custom_theme_experiment
 }
 
 # plots of individual performances

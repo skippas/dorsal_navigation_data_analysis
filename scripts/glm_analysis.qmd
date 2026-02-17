@@ -81,7 +81,7 @@ mTest <- choices %>%
   # I removed day from the model below because brightDiff experiment causes trouble if its excluded. There is obviously a smarter way around that issue however
   map(~ glmer(
     decision ~ rank_trial + sideAlt_trial + reward_side +
-               (reward_side | individual),
+               (1 | individual),
                data = .x, family = binomial))
 
 # get resuls into tidy format
@@ -246,38 +246,82 @@ emmTcPts <- emmTcAll %>%
 
 ```
 
-```{r formatMasterTables}
+```{r formatTestTables}
 
 # prettify tables for reporting in line
+source("functions/format_numeric_cols.R")
 
-# do it for test results
+# rename terms in model tables so they are easy to access in inline writing
+term_labels <- c(
+  "(Intercept)"      = "int",
+  "rank_trial"       = "trial",
+  "reward_sideRight" = "sideR",
+  "sideAlt_trialTRUE" = "sideAltT"
+)
+
 emmTestPtsDisp <- emmTestPts %>%
   group_by(experiment, nat_or_art) %>%
   # add a 'trial pos' variable that will make indexing table easier:
   mutate(
     trial_pos = case_when(
-      rank_trial == 1 ~ "start",
-      rank_trial == max(rank_trial, na.rm = TRUE) ~ "end",
+      rank_trial == 1 ~ "first",
+      rank_trial == max(rank_trial, na.rm = TRUE) ~ "last",
       rank_trial > 1 & rank_trial < max(rank_trial, na.rm = TRUE) ~ "middle"),
-    probConfint = sprintf("%.3f %.3f-%.3f", prob, asymp.LCL, asymp.UCL)
+    probFmt = sprintf("%.3f", prob),
+    confintFmt = sprintf("%.3f-%.3f", asymp.LCL, asymp.UCL)
     ) %>%
   # pivot the data wider to allow for easy indexing of table
-  select(experiment, rank_trial, probConfint, trial_pos) %>%
+  select(experiment, nat_or_art, rank_trial, probFmt, confintFmt, trial_pos) %>%
   pivot_wider(names_from = trial_pos,
-              values_from = c(probConfint, rank_trial)) 
+              values_from = c(probFmt, confintFmt, rank_trial),
+              names_glue = "{trial_pos}_{.value}") 
 emmTestPtsDisp <- column_to_rownames(emmTestPtsDisp, "experiment")
+
+# test model coefficients (display table)
+mTestTidyDisp <- mTestTidy %>%
+  mutate(pFmt = pvalue(mTestTidy$p.value, accuracy = 0.001)) %>%
+    fmtNumCols() %>%
+  mutate(confint = paste(conf.low, conf.high, sep = "-"),
+         term_label = recode(term, !!!term_labels))
+
+mTestTidyWideDisp <- mTestTidyDisp %>%
+  rename(est = estimate, pval = p.value) %>%
+  select(term_label, est, pval, pFmt, confint, experiment) %>%
+  pivot_wider(
+    names_from = "term_label",
+    values_from = c("est", "pval", "pFmt", "confint"),
+    names_glue = "{term_label}_{.value}"
+  )
+
+testTrialSlopeDisp <- mTestTidy %>%
+  filter(term == "rank_trial") %>%
+  left_join(
+    unique(choices[, c("experiment", "nat_or_art")]),
+    by = "experiment"
+  ) %>%
+  transmute( # allows you to mutate and drop columns not needed in one call. 
+    experiment, nat_or_art,
+    trialLogOdds = sprintf("%.3f", estimate),
+    ci95 = sprintf("%.3f-%.3f", conf.low, conf.high),
+    pFmt = scales::pvalue(p.value, accuracy = 0.001),
+    oddsMultiplierPerTrial = sprintf("%.3f", exp(estimate))
+  ) %>%
+  arrange(nat_or_art, experiment)
 
 testRes <- list(
   emmAll = emmTestAll,
   emmPts = emmTestPts,
   emmPtsDisp = emmTestPtsDisp,
-  mCoefs = mTestTidy
+  mCoefs = mTestTidy,
+  mCoefsDisp = mTestTidyWideDisp,
+  trialSlopeDisp = testTrialSlopeDisp
 )
 
-################################
+```
+
+```{r formatTcTables}
 
 # a) test + ctrl pts results
-
 emmTcPtsDisp <- emmTcPts %>%
   group_by(experiment, nat_or_art) %>%
   # add a 'trial pos' variable that will make indexing table easier:
@@ -296,54 +340,62 @@ emmTcPtsDisp <- emmTcPts %>%
 emmTcPtsDisp <- column_to_rownames(emmTcPtsDisp, "experiment")
 
 # b) test vs ctrl contrast results
-
 # function also formats rank_trial (whole numbers that are numeric). Undesirable.
-source("functions/format_numeric_cols.R")
 contLnTc$pFmt <- scales::pvalue(contLnTc$p.value)
 contLnTcDisp <- fmtNumCols(contLnTc)
-contLnTcDisp$confint <- sprintf("%s-%s", contLnTcDisp$asymp.LCL, contLnTcDisp$asymp.UCL)
+contLnTcDisp$confint <- sprintf(
+  "%s-%s", contLnTcDisp$asymp.LCL, contLnTcDisp$asymp.UCL)
 
 emmContRspTc # add this to list of tables? !!!! NULL output??? 
 
 # c) model results
-mTcTidyDisp <- cbind(mTcTidy, pFmt = pvalue(mTcTidy$p.value, accuracy = 0.001))
-mTcTidyDisp <- fmtNumCols(mTcTidyDisp)
-mTcTidyDisp$confint <- paste(mTcTidyDisp$conf.low, mTcTidyDisp$conf.high, sep = "-")
-
-# rename terms in modelResults so that they're easier to access in in-line results
-# alternative ways to do this are to assign variables new local names before the model:
-# eg: rt <- df$rank_trial , then run model like (response ~ rt) 
-term_labels <- c(
-  "(Intercept)"      = "int",
-  "rank_trial"       = "trial",
-  "reward_sideRight" = "sideR",
-  "sideAlt_trialTRUE" = "sideAltT"
-#  "rank_trial:reward_sideRight" = "Trial × Reward side"
-)
-mTcTidyDisp <- mTcTidyDisp %>% 
-  mutate(term_label = recode(term, !!!term_labels))
+mTcTidyDisp <- mTcTidy %>%
+  mutate(pFmt = pvalue(mTcTidy$p.value, accuracy = 0.001)) %>%
+  fmtNumCols() %>%
+  mutate(confint = paste(conf.low, conf.high, sep = "-"),
+         term_label = recode(term, !!!term_labels))
 
 # pivot wider to make in line results easier to write / access
 # but first rename
-mTcTidyWideDisp <- mTcTidyDisp %>% rename(est = estimate, pval = p.value) %>%
-  # only keep columns interested in
+mTcTidyWideDisp <- mTcTidyDisp %>% 
+  rename(est = estimate, pval = p.value) %>%
   select(term_label, est, pval, pFmt, confint, experiment) %>%
   pivot_wider(names_from = "term_label",
               values_from = c("est", "pval", "pFmt", "confint"),
               names_glue  = "{term_label}_{.value}")
+
+tcTrialSlopeDisp <- mTcTidy %>%
+  filter(term == "rank_trial") %>%
+  left_join(
+    unique(choices[, c("experiment", "nat_or_art")]),
+    by = "experiment"
+  ) %>%
+  transmute(
+    experiment, nat_or_art,
+    trialLogOdds = sprintf("%.3f", estimate),
+    ci95 = sprintf("%.3f-%.3f", conf.low, conf.high),
+    pFmt = scales::pvalue(p.value, accuracy = 0.001),
+    oddsMultiplierPerTrial = sprintf("%.3f", exp(estimate))
+  ) %>%
+  arrange(nat_or_art, experiment)
+
+# clean up
 
 tcRes <- list(
   mCoefsDisp = mTcTidyWideDisp,
   contrastsDisp = contLnTcDisp,
   emmPtsDisp = emmTcPtsDisp,
   emmAll = emmTcAll,
-  emmPts = emmTcPts)
+  emmPts = emmTcPts,
+  trialSlopeDisp = tcTrialSlopeDisp)
 
-rm(
-  mTest, mTc, mTestTidy, emmTestAll, emmTestPts, emmTestPtsDisp,
-  mTcTidy, mTcTidyDisp, mTcTidyWideDisp, emmTcAll, emmTcPts, emmTcPtsDisp,
-  contLnTc, contLnTcDisp, emmContRspTc, term_labels
-)
+rm(mTest, mTestTidy, mTestTidyDisp, mTestTidyWideDisp,
+   testTrialSlopeDisp, emmTestAll, emmTestPts, emmTestPtsDisp,
+   mTc, mTcTidy, mTcTidyDisp, mTcTidyWideDisp,
+   tcTrialSlopeDisp,
+   emmTcAll, emmTcPts, emmTcPtsDisp,
+   contLnTc, contLnTcDisp, emmContRspTc,
+   term_labels)
 
 ```
 
@@ -429,7 +481,7 @@ emmTcPtsDispQ1$confintFmt_testEnd
 contrastsDispQ1
 ```
 
-During the test phase of the experiment, trial number (experience) had a significant positive effect on the expected probability (\Pcorr) of a correct decision (Figure 1 solid line) with every successive trial increasing the log odds of a correct decision by `r mCoefsDispQ1$trial_est` (95% CI `r mCoefsDispQ1$trial_confint`, p `r mCoefsDispQ1$trial_pFmt`). 
+During the test phase of the experiment, trial number (experience) had a significant positive effect on the expected probability (\Pcorr) of a correct decision (Figure 1 solid line) with every successive trial increasing the log odds of a correct decision by `r mCoefsDispQ1$trial_est` (95% CI `r mCoefsDispQ1$trial_confint`, p `r mCoefsDispQ1$trial_pFmt`).
 
 The \Pcorr of a correct choice at the end of the test was higher (\Pcorr = `r emmTcPtsDispQ1$probFmt_testEnd`, 95% CI `r emmTcPtsDispQ1$confintFmt_testEnd`) than at the start of the control (\Pcorr = `r emmTcPtsDispQ1$probFmt_ctrlStart`, 95% CI: `r emmTcPtsDispQ1$confintFmt_ctrlStart`), and this difference was significant (log odds ratio = `r contrastsDispQ1$logOddsRatio`, p `r contrastsDispQ1$pFmt`) (Figure 1, compare error bars between test and control panel).
 
@@ -450,117 +502,58 @@ rm(
 - Can they distinguish simple brightness differences? 
 - are there differences in performance among artificial stimuli?
 
-```{r}
-# filter so that only artificial canopies remain
-testRes
+```{r q2FromMaster}
 
-```
+emmArtAll <- testRes$emmAll %>%
+  filter(nat_or_art == "artificial")
 
-```{r q2FitArtModel, eval=TRUE}
-
-# only interested in test phase here and artificial canopies
-choices_test <- choices %>% 
-  filter(manipulation == "test" & nat_or_art == "artificial") 
-# model including day as a predictor:
-choices_test$experiment <- relevel(choices_test$experiment, ref = "perpPara_170725")
-# reading the output below is a nightmare. rather run a series of models?
-# also, homogenise the models run between the questions. glmer, same predictors
-art_glm <- glm(
-  decision ~ (rank_trial + sideAlt_trial + day + reward_side) * experiment,
-  data = choices_test, family = binomial) 
-# honestly, everything will be much simplified by just removing day from the experiment, otherwise I have to handle day in a particular way with emmeans downstream. The other (perhaps better) solution is to run day as random effect in a model that includes all experiments
-art_glm <- glm(
-  decision ~ (rank_trial + sideAlt_trial + reward_side) * experiment,
-  data = choices_test, family = binomial)
-
-first_last_trials <- tapply(
-  choices_test$rank_trial, droplevels(choices_test$experiment), max)
-
-# find emmeans
-emmArt <- emmeans(art_glm, ~ rank_trial ,
-               at = list(rank_trial = first_last_trials),
-                         by = "experiment",
-               type = "response") %>% as.data.frame()
-# with this function, you could probably also get around the 'day issue' by mapping day to the function. That's if a reviewer insists on you including day as a factor in the analysis
-# apparently this day issue would be solved by taking an overall experiment modelling approach and modelling day as a random effect
-emmArt <- map2(.x = first_last_trials, .y = names(first_last_trials),
-     function(x, y){
-       emmeans(art_glm, ~ rank_trial,
-               at = list(
-                 experiment = y,
-                 rank_trial = c(1, x)),
-      type = "response"
-    ) %>%
-      as.data.frame() %>%
-      mutate(
-        experiment = y,
-        trial_pos = if_else(rank_trial == 1, "first", "last")
-        )
-  }
-)
-
-# plotting curves
-choices_test$predicted_probabilities <- predict(art_glm, type = "response")
-
-p <- ggplot(data = choices_test, 
-       aes(x = rank_trial, y = predicted_probabilities))+
-  geom_smooth(aes(colour = day), method = "glm", method.args = list(family = binomial), alpha = 0.5)+
-  # geom_point(data = comp_points,
-  #            aes(x = rank_trial, y = predicted_probabilities),
-  #            size = 4.5, stroke = 1.5, shape = 21, color = "black")+
-  labs(x = "Trial", y = "% of decisions for reward")+
-  scale_y_continuous(labels = scales::percent)+
-  scale_colour_viridis_d()+
-  # scale_fill_viridis_d()+
-  #  scale_color_brewer(type = "qual", palette = "Set3")+
-  geom_hline(yintercept = 0.5, lty = 2, size = 1.5)+
-  custom_theme_text_enlarged+
+p <- ggplot(emmArtAll, aes(x = rank_trial, y = prob)) +
+  geom_ribbon(aes(ymin = asymp.LCL, ymax = asymp.UCL), alpha = 0.2) +
+  geom_line() +
+  labs(x = "Trial", y = "% of decisions for reward") +
+  scale_y_continuous(labels = scales::percent) +
+  geom_hline(yintercept = 0.5, lty = 2) +
+  custom_theme_text_enlarged +
   facet_wrap(vars(experiment))
-ggsave("//Users//andrescheepers//Desktop//berlin_ICN_poster//exp_comp_lineplot_perf_across_trials.png", plot = last_plot(),
-       width = 10, height = 6.5, dpi =300)
 
-# add binned points to plot
-df_rolling <- choices_test %>%
-  arrange(rank_trial) %>%
-  group_by(individual, experiment) %>%
-  mutate(
-    pcorr = rollmean(decision, k = 3, fill = NA, align = "center")
-  ) %>%
-  # average over individual
-  ungroup() %>% group_by(rank_trial, experiment) %>%
-  summarise(pcorr = mean(pcorr))
+# add binned points from master rolling object
+df_rolling <- choices_rolling %>%
+  filter(manipulation == "test", nat_or_art == "artificial")
 
-p + geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr))
+p + geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr),
+               colour = "grey")
 
-# prettify tables for in-line results
-emmArt <- bind_rows(emmArt) %>%
-  mutate(probFmt = round(prob, 3)) 
-emmArt$confint <- sprintf("%.3f-%.3f", emmArt[,"asymp.LCL"], emmArt[,"asymp.UCL"])
+# table used in Q2 inline writing (from master display table)
+emmArt <- testRes$emmPtsDisp %>%
+  tibble::rownames_to_column("experiment") %>%
+  filter(nat_or_art == "artificial") %>%
+  tibble::column_to_rownames("experiment")
 
-emmArt <- emmArt %>%
-  select(experiment, trial_pos, probFmt, confint) %>%
-  pivot_wider(
-    names_from = trial_pos,
-    values_from = c(probFmt, confint),
-    names_glue = "{trial_pos}_{.value}"
-  )
-# rename rows and pivot wide to make indexing easier 
-emmArt <- tibble::column_to_rownames(emmArt, "experiment")
+#
 
-# need to include the trial numbers in final summary df
 ```
 
 
 ```{r q2ContrastArtStimuli}
-# to compare performance among artificial experiments use something like below: 
-contArt <- emtrends(art_glm, specs = pairwise ~ experiment, var = "rank_trial")
+# Option 2: one-row-per-experiment trial-slope table for Q2
+q2TrialSlopeTable <- testRes$trialSlopeDisp %>%
+  filter(nat_or_art == "artificial") %>%
+  select(-nat_or_art)
+
+q2TrialSlopeTable
 ```
 
-Oblique stripe results:
+To answer whether wasps require optic flow information to discriminate patterns we tested whether they could distinguish between oblique stripes oriented at 45 degrees to the right or left of the y-maze arm's long axis and the general direction of wasp travel. 
 
-To answer whether wasps require optic flow information to discriminate patterns we tested whether they could distinguish between oblique stripes oriented at 45 degrees to the right or left of the y-maze arm and the general direction of wasp travel. Wasps had no trouble distinguishing between oblique stripes that presumably produce identical rates of optic flow in the dorsal visual field. Initial performance (at trial 1) was not significantly different from chance (pcorr = `r emmArt["thinOb_150823", "first_probFmt"]`, 95% CI: `r emmArt["thinOb_150823", "first_confint"]`) but rose steeply, reaching `r emmArt["thinOb_150823", "last_probFmt"]` (95% CI: `r emmArt["thinOb_150823", "last_confint"]`) by the end of the experiment (trial 66), which is significantly higher than expected by chance (50%).
+Wasps had no trouble distinguishing between oblique stripes that presumably produce identical rates of optic flow in the dorsal visual field (Figure 2). Similar to the perpendicular-parallel experiment, trial had a significant positive effect on \Pcorr, with every successive trial increasing the log odds of a correct decision by xxx.
 
-Next, we asked whether wasps could discriminate between an opaque and transparent roof, ie. between stimuli that carried little to no pattern information. At the onset of the experiment (trial 1), wasp performance was not significantly different from 50% (\Pcorr = `r emmArt["brightDiff_250725", "first_probFmt"]`, 95% CI: `r emmArt["brightDiff_250725", "first_confint"]`))  but rose with experience and by the end of the experiment (trial 26) was `r emmArt["brightDiff_250725", "last_probFmt"]` (95% CI: `r emmArt["brightDiff_250725", "last_confint"]`). Performance at the end of the experiment is not significantly higher than 50% because of the increased uncertainty in the slope / effect of trials on performance due to the lower number of trials run in this experiment. However, if one uses other metrics or analyses to compare performance to the 50% line, they are significantly different (for example, comparing performance at an intermediate trial or comparing the average performance of the last five trials to the 50% line).
+Initial performance (at trial 1) was not significantly different from chance (\Pcorr = `r emmArt["thinOb_150823", "first_probFmt"]`, 95% CI: `r emmArt["thinOb_150823", "first_confint"]`) but rose steeply, reaching `r emmArt["thinOb_150823", "last_probFmt"]` (95% CI: `r emmArt["thinOb_150823", "last_confint"]`) by the end of the experiment (trial 66), which is significantly higher than expected by chance (50%).
+
+Next, we asked whether wasps could discriminate between an opaque and transparent roof, ie. between stimuli that carried little to no pattern information. At the onset of the experiment (trial 1), wasp performance was not significantly different from 50% (\Pcorr = `r emmArt["brightDiff_250725", "first_probFmt"]`, 95% CI: `r emmArt["brightDiff_250725", "first_confint"]`))  but rose with experience and by the end of the experiment (trial 26) \Pcorr was `r emmArt["brightDiff_250725", "last_probFmt"]` (95% CI: `r emmArt["brightDiff_250725", "last_confint"]`). 
+
+Performance at the end of the experiment is only borderline significantly higher than 50% because of the increased uncertainty in the slope / effect of trials on performance due to the lower number of trials run in this experiment. However, if one uses other metrics or analyses to compare performance to the 50% line, they are significantly different (for example, comparing performance at an intermediate trial or comparing the average performance of the last five trials to the 50% line).
+
+NBNB! Slope or brightdiff exp not significant. remove best fit line.
 
 Comparison among different artificial stimuli:
 

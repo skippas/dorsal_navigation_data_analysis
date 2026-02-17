@@ -20,40 +20,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -71,10 +37,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 </head>
 
-<body class="fullcontent">
+<body>
 
 <div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
-
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+<div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="../glm_analysis.pdf"><i class="bi bi-file-pdf"></i>PDF</a></li></ul></div></div>
 <main class="content" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
@@ -96,201 +63,103 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </header>
 
 
-<div class="cell">
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span>opts_knit<span class="sc">$</span><span class="fu">set</span>(<span class="at">root.dir =</span> rprojroot<span class="sc">::</span><span class="fu">find_rstudio_root_file</span>())</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span>opts_chunk<span class="sc">$</span><span class="fu">set</span>(</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">echo    =</span> <span class="cn">FALSE</span>,  <span class="co"># hide code</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">message =</span> <span class="cn">FALSE</span>,  <span class="co"># hide package messages</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">warning =</span> <span class="cn">FALSE</span>   <span class="co"># hide warnings</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<p>load up the raw data</p>
+<p>Make the computations necessary for all questions:</p>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
-<pre><code>Data processing complete!
-Final dataset 'choices' contains 6934 observations
-Experiments: natcan4_180825, thickOb_140823, thinOb_150823, perpPara_240723, natcan1_170923, thickObDiff_210924, perpPara_170725, natcan2_300725, natcan3_080825, natcan5_290825, natcan3_190925, natcan6_070925, perpParaPostNatcan_090925, brightDiff_250725, thick_oblique_apis </code></pre>
+<pre><code>                  contrast odds.ratio        SE  df null    z.ratio
+1 test_end / control_start   2.161893 1.3957117 Inf    1  1.1942185
+2 test_end / control_start   1.302833 0.5337640 Inf    1  0.6457023
+3 test_end / control_start   2.921793 1.3532234 Inf    1  2.3150201
+4 test_end / control_start   0.649945 0.3150206 Inf    1 -0.8889584
+5 test_end / control_start   7.156515 3.9704981 Inf    1  3.5472092
+6 test_end / control_start   7.059280 3.7730719 Inf    1  3.6565048
+       p.value      experiment control_start test_end
+1 0.2323924959  natcan1_170923             1      119
+2 0.5184721949  natcan3_080825             1       64
+3 0.0206118297  natcan3_190925             1      131
+4 0.3740254126  natcan4_180825             1      100
+5 0.0003893353 perpPara_170725             1       47
+6 0.0002556776   thinOb_150823             1       66</code></pre>
 </div>
 </div>
+<section id="question-1-can-wasps-use-dorsal-patterns" class="level1">
+<h1>Question 1: Can wasps use dorsal patterns?</h1>
+<pre><code>-   Looking at test versus control proportion correct
+-   Slope in test and control
+-   EMmeans at end of test and control
+    -   is this essentially equivalent to binning the last n trials and making the comparison?</code></pre>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="glm_analysis_files/figure-html/q1PlotAndFilterTables-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>NULL</code></pre>
+</div>
+</div>
+<p>During the test phase of the experiment, trial number (experience) had a significant positive effect on the expected probability () of a correct decision. Every successive trial increases the log odds of a correct decision by 0.060 (95% CI 0.031, 0.089, ).</p>
+<p>The of a correct choice at the end of the test was higher (0.905) than at the start of the control (= 0.572, 95% CI: [0.358, 0.763]), and this difference was significant (log odds ratio = 1.968, p &lt;0.001).</p>
+<p>Also note that the for the test is estimated to be significantly above chance (95% confidence ribbon does not overlap the 50% line) for the entire duration of the test. In contrast, the pcorr in the control phase is never significantly above chance for the duration of the control (95% confidence ribbon overlaps the 50% line).</p>
+<p>That the model suggests naive wasps perform above chance at the onset of the test phase (ie. in trial 1) can be attributed to the fact that the model is unable to fit the rapid learning of the wasps, rather than to the availability and learning of olfactory and / or temporal cues during the pre-test training phase. This is supported by the proportion of correct decisions in the first few 3-trial wide windows of the test phase (black points) that are clustered around 50%.</p>
+</section>
+<section id="question-2-what-information-are-wasps-using-to-discriminate-patterns" class="level1">
+<h1>Question 2: What information are wasps using to discriminate patterns?</h1>
 <ul>
-<li>Can wasps use dorsal patterns?
-<ul>
-<li>Looking at test versus control proportion correct</li>
-<li>Slope in test and control</li>
-<li>EMmeans at end of test and control
-<ul>
-<li>is this essentially equivalent to binning the last n trials and making the comparison?</li>
-</ul></li>
-</ul></li>
+<li>Do they need optic flow?</li>
+<li>Can they distinguish simple brightness differences?</li>
+<li>are there differences in performance among artificial stimuli?</li>
 </ul>
 <div class="cell">
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="glm_analysis_files/figure-html/unnamed-chunk-3-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="glm_analysis_files/figure-html/unnamed-chunk-3-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="glm_analysis_files/figure-html/q2FitArtModel-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
-<p>For the test, trial number (experience) has a significant positive effect (slope) on the expected probability / proportion of correct decisions (pcorr). The slope for the relationship between trial and pcorr is 0.057 - that is, the log odds of a correct decision increases by 0.057 after each successive trial.</p>
-<p>The predicted probability of a correct choice at the end of the test (0.941) was higher than at the start (trial 1) of the control 0.570 (95% CI: [0.373, 0.747]), and this difference between the end of test and start of control was significant (odds ratio = 12.089, p &lt;0.001).</p>
-<p>Also note that the pcorr for the test is estimated to be significantly above chance (95% confidence ribbon does not overlap the 50% line) for the entire duration of the test and by the end of the test phase (in the 47th trial) is estimated to be NA. In contrast, the pcorr in the control phase is never significantly above chance for the duration of the control (95% confidence ribbon overlaps the 50% line).</p>
-<p>That the model suggests naive wasps perform above chance at the onset of the test phase (ie. in trial 1) can be attributed to the fact that the model is unable to fit the rapid learning of the wasps, rather than to the availability and learning of olfactory and / or temporal cues during the pre-test training phase. This is supported by the proportion of correct decisions in the first few 3-trial wide windows of the test phase (black points) that are clustered around 50%.</p>
-<p>Question 2: What information are wasps using to discriminate patterns? - Do they need optic flow? - Can they distinguish simple brightness differences? - are there differences in performance among artificial stimuli?</p>
-<div class="cell">
-<div class="cell-output cell-output-stdout">
-<pre><code>
-Call:
-glm(formula = decision ~ rank_trial * experiment + sideAlt_trial * 
-    experiment + day * experiment + reward_side * experiment, 
-    family = binomial, data = choices_test)
-
-Coefficients: (1 not defined because of singularities)
-                                              Estimate Std. Error z value
-(Intercept)                                    1.09651    0.33829   3.241
-rank_trial                                     0.06205    0.02078   2.986
-experimentbrightDiff_250725                   -0.04754    0.59009  -0.081
-experimentthinOb_150823                       -2.23802    0.46358  -4.828
-sideAlt_trialTRUE                              0.03744    0.28378   0.132
-day2                                          -0.72022    0.50238  -1.434
-reward_sideR                                  -1.41110    0.29194  -4.834
-rank_trial:experimentbrightDiff_250725        -0.02914    0.04127  -0.706
-rank_trial:experimentthinOb_150823            -0.03105    0.02381  -1.304
-experimentbrightDiff_250725:sideAlt_trialTRUE -0.41851    0.51028  -0.820
-experimentthinOb_150823:sideAlt_trialTRUE     -0.01682    0.37635  -0.045
-experimentbrightDiff_250725:day2                    NA         NA      NA
-experimentthinOb_150823:day2                   0.64526    0.64135   1.006
-experimentbrightDiff_250725:reward_sideR       0.51925    0.53045   0.979
-experimentthinOb_150823:reward_sideR           3.74573    0.39861   9.397
-                                              Pr(&gt;|z|)    
-(Intercept)                                    0.00119 ** 
-rank_trial                                     0.00283 ** 
-experimentbrightDiff_250725                    0.93579    
-experimentthinOb_150823                       1.38e-06 ***
-sideAlt_trialTRUE                              0.89504    
-day2                                           0.15168    
-reward_sideR                                  1.34e-06 ***
-rank_trial:experimentbrightDiff_250725         0.48014    
-rank_trial:experimentthinOb_150823             0.19225    
-experimentbrightDiff_250725:sideAlt_trialTRUE  0.41213    
-experimentthinOb_150823:sideAlt_trialTRUE      0.96435    
-experimentbrightDiff_250725:day2                    NA    
-experimentthinOb_150823:day2                   0.31437    
-experimentbrightDiff_250725:reward_sideR       0.32763    
-experimentthinOb_150823:reward_sideR           &lt; 2e-16 ***
----
-Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-(Dispersion parameter for binomial family taken to be 1)
-
-    Null deviance: 993.86  on 815  degrees of freedom
-Residual deviance: 837.52  on 802  degrees of freedom
-AIC: 865.52
-
-Number of Fisher Scoring iterations: 4</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>
-Call:
-glm(formula = decision ~ rank_trial + sideAlt_trial + reward_side + 
-    rank_trial:experiment + experiment:sideAlt_trial + experiment:reward_side, 
-    family = binomial, data = choices_test)
-
-Coefficients:
-                                              Estimate Std. Error z value
-(Intercept)                                    0.09257    0.18844   0.491
-rank_trial                                     0.06169    0.01010   6.107
-sideAlt_trialTRUE                              0.45680    0.25772   1.772
-reward_sideR                                  -1.02095    0.26627  -3.834
-rank_trial:experimentbrightDiff_250725         0.01384    0.03085   0.448
-rank_trial:experimentthinOb_150823            -0.05408    0.01031  -5.246
-sideAlt_trialTRUE:experimentbrightDiff_250725 -0.52461    0.45863  -1.144
-sideAlt_trialTRUE:experimentthinOb_150823     -0.85995    0.33061  -2.601
-reward_sideR:experimentbrightDiff_250725       0.52778    0.46343   1.139
-reward_sideR:experimentthinOb_150823           2.91768    0.35723   8.168
-                                              Pr(&gt;|z|)    
-(Intercept)                                   0.623243    
-rank_trial                                    1.02e-09 ***
-sideAlt_trialTRUE                             0.076312 .  
-reward_sideR                                  0.000126 ***
-rank_trial:experimentbrightDiff_250725        0.653805    
-rank_trial:experimentthinOb_150823            1.56e-07 ***
-sideAlt_trialTRUE:experimentbrightDiff_250725 0.252679    
-sideAlt_trialTRUE:experimentthinOb_150823     0.009293 ** 
-reward_sideR:experimentbrightDiff_250725      0.254771    
-reward_sideR:experimentthinOb_150823          3.15e-16 ***
----
-Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-(Dispersion parameter for binomial family taken to be 1)
-
-    Null deviance: 993.86  on 815  degrees of freedom
-Residual deviance: 872.05  on 806  degrees of freedom
-AIC: 892.05
-
-Number of Fisher Scoring iterations: 4</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>$emtrends
- experiment        rank_trial.trend      SE  df asymp.LCL asymp.UCL
- perpPara_170725            0.06169 0.01010 Inf   0.04189    0.0815
- brightDiff_250725          0.07553 0.03050 Inf   0.01566    0.1354
- thinOb_150823              0.00761 0.00591 Inf  -0.00398    0.0192
-
-Results are averaged over the levels of: sideAlt_trial, reward_side 
-Confidence level used: 0.95 
-
-$contrasts
- contrast                            estimate     SE  df z.ratio p.value
- perpPara_170725 - brightDiff_250725  -0.0138 0.0309 Inf  -0.448  0.8951
- perpPara_170725 - thinOb_150823       0.0541 0.0103 Inf   5.246  &lt;.0001
- brightDiff_250725 - thinOb_150823     0.0679 0.0301 Inf   2.253  0.0627
-
-Results are averaged over the levels of: sideAlt_trial, reward_side 
-P value adjustment: tukey method for comparing a family of 3 estimates </code></pre>
-</div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="glm_analysis_files/figure-html/unnamed-chunk-4-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Just keeping it simple and making comparisons to the 50% line after different points in the experiment: different models (like those including day or not) might produce very different slope estimates for the effect of learning, so I want to avoid that complexity for now. Whereas the predictions of the probability of a correct decision after n trials (and days) changes much less I reckon.</p>
-<p>To answer whether wasps require optic flow information to discriminate patterns we tested whether they could distinguish between oblique stripes oriented at 45 degrees to the right or left of the y-maze arm and the general direction of wasp travel. Wasps had no trouble distinguishing between oblique stripes that presumably produce identical rates of optic flow. Initial performance (at trial 1) was not significantly different from chance (pcorr = , 95% CI: ) but rose steeply, reaching 0.984403, NA, 0.8853961 (95% CI: 0.984403, NA, 0.8853961 ) by the end of the experiment, which is significantly higher than expected by chance (50%).</p>
-<p>Next, we asked whether wasps could discriminate between an opaque and transparent roof, ie. between stimuli that carried little to no pattern information. Wasp performance was not significantly different from 50% (pcorr = 0.60955, 95% CI: [0.436, 0.759])) at the onset of the experiment (trial 1), but rose with experience and by trial 13 pcorr was 0.6985397 (95% CI: [0.581, 0.795]) and significantly different from 50%. The line of best fit suggests a continued increase in performance and a pcorr of 0.7804339 (95% CI: [0.500, 0.927] by the end of the experiment (trial 26). Performance at the end of the experiment is not significantly higher than 50% because of the increased uncertainty in the slope / effect of trials on performance due to the lower number of trials run in this experiment.</p>
+<p>Oblique stripe results:</p>
+<p>To answer whether wasps require optic flow information to discriminate patterns we tested whether they could distinguish between oblique stripes oriented at 45 degrees to the right or left of the y-maze arm and the general direction of wasp travel. Wasps had no trouble distinguishing between oblique stripes that presumably produce identical rates of optic flow in the dorsal visual field. Initial performance (at trial 1) was not significantly different from chance (pcorr = 0.521, 95% CI: [0.409, 0.631]) but rose steeply, reaching 0.88 (95% CI: [0.796, 0.932]) by the end of the experiment (trial 66), which is significantly higher than expected by chance (50%).</p>
+<p>Next, we asked whether wasps could discriminate between an opaque and transparent roof, ie. between stimuli that carried little to no pattern information. At the onset of the experiment (trial 1), wasp performance was not significantly different from 50% (= 0.61, 95% CI: [0.436, 0.759])) but rose with experience and by the end of the experiment (trial 26) was 0.78 (95% CI: [0.500, 0.927]). Performance at the end of the experiment is not significantly higher than 50% because of the increased uncertainty in the slope / effect of trials on performance due to the lower number of trials run in this experiment. However, if one uses other metrics or analyses to compare performance to the 50% line, they are significantly different (for example, comparing performance at an intermediate trial or comparing the average performance of the last five trials to the 50% line).</p>
 <p>Comparison among different artificial stimuli:</p>
 <p>issues: - day is mulitcollinear in thin oblique experiment. It makes the slope of thin oblique appear less steep. This drives the difference in slopes detected between perppara and thin oblique. The issue is, is it real? I’m not confident enough that I ran the experiments in exactly the same way so as to make them comparable. If we remove day from the analysis, would we still find a significant difference in the slopes? Could the difference simply be attributable to slower learning due to the side bias which is clearly evident in the thin oblique experiment (possibly caused because of different pre-testing training regimes). Why even is there a side bias when these wasps had just come off the back of a previous experiment with a thick oblique stripe? was the side bias present at that time? - the issue im trying to get at above is that conclusions regarding slope diffs depend on the model you run. - massive confidence intervals around brightness experiment</p>
-<p>Question 3: - Can wasps use naturalistic patterns for navigation? - Are there differences in performance between naturalistic and artificial?</p>
+</section>
+<section id="question-3-can-wasps-use-naturalistic-patterns-for-navigation" class="level1">
+<h1>Question 3: Can wasps use naturalistic patterns for navigation?</h1>
+<ul>
+<li>Are performances different from 50%?</li>
+<li>Are performances different from the control?</li>
+<li>Are there differences in performance between naturalistic and artificial stimuli?</li>
+</ul>
 <div class="cell">
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="glm_analysis_files/figure-html/unnamed-chunk-5-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="glm_analysis_files/figure-html/q3NaturalisticTest-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
-<p>comparing naturalistic test vs control</p>
+<p>Discrimination performance for naturalistic canopies tends to be lower than for artificial canopies (make some sort of comparison or just give ranges) and evidence for whether wasps can discriminate naturalistic canopies at above-chance rates (&gt;50%) is mixed. While was generally lower than for the artificial canopies, in four of the seven naturalistic canopy pairs we tested, the predicted by the end of the experiment was significantly above chance (the lower limit of the 95% CI is &gt; 50%, see Table x), suggesting there may be able to separate certain pairs of naturalistic canopies to some degree (assuming no other information was available to the wasps).</p>
+<p>naturalistic test vs control</p>
 <div class="cell">
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="glm_analysis_files/figure-html/unnamed-chunk-6-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="glm_analysis_files/figure-html/q3NaturalisticTestControl-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
+<p>Produce necessary tables to report from in-line and to include in MS.</p>
+<p>Write results here: Evidence that wasps can discriminate naturalistic canopies from the test vs control analysis is also mixed.</p>
 <p>Coming soon: 1. comparison of naturalistic stimuli versus artificial</p>
+<p>Q3 test vs control old code. redundant , can be thrown away</p>
 <p>Misc code that can likely be thrown away:</p>
+</section>
 
 </main>
 <!-- /main column -->

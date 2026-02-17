@@ -4,7 +4,8 @@ format:
   pdf:
     include-in-header:
       text: |
-        \newcommand{\Pcorr}{\(P_{\mathrm{corr}}\)}
+          \usepackage{xspace}
+          \newcommand{\Pcorr}{\ensuremath{P_{\mathrm{corr}}}\xspace}
 execute:
   dir: project
   
@@ -49,6 +50,7 @@ choices$manipulation <- relevel(choices$manipulation, ref = "test")
 
 Make the computations necessary for all questions:
 ```{r buildTestModels}
+#| cache: true
 
 # the goal is to generate 2/3 types of table for the test models and the test+ctrl models
 # 1. table of model coefficients, 
@@ -70,7 +72,7 @@ Make the computations necessary for all questions:
 # emmTestPts  | tibble(long)  | key test trial predictions (start/middle/end)             | emmTestAll           | display table building
 
 # testPtsDisp   | tibble(wide)  | display-ready start/middle/end test predictions by exp    | emmTestPts           | inline reporting
-# testRes     | named list    | bundled test outputs (predAll, predPts, mCoefs)           | objects above        | per-question filtering/reuse
+# testRes     | named list    | bundled test outputs (emmAll, emmPts, mCoefs)           | objects above        | per-question filtering/reuse
 
 # 1: models looking at test only
 mTest <- choices %>% 
@@ -91,7 +93,8 @@ emmTestAll <- map2(
   function(m, exp_id) {
 
     emmeans(m, ~ rank_trial,
-          cov.keep = "rank_trial", # gets predictions for every trial rather than covariate avg
+            # gets predictions for every trial rather than covariate avg
+          cov.keep = "rank_trial", 
           type = "response") %>%
       as.data.frame() %>%
       mutate(experiment = exp_id)
@@ -117,6 +120,7 @@ emmTestPts <- emmTestAll %>%
 ```
 
 ```{r buildTcModels}
+#| cache: false
 
 # ==== Object Index: Test+Control (tc) ====
 # object          | type          | description                                              | builtFrom                | usedIn
@@ -129,7 +133,7 @@ emmTestPts <- emmTestAll %>%
 # emmTcPts        | tibble(long)  | endpoint predictions (test end + control start)         | emmTcAll              | endpoint display table
 # emmTcPtsDisp    | tibble(wide)  | display-ready endpoint probabilities/CIs by experiment  | emmTcPts                 | inline endpoint text
 
-# contLnTcDisp    | tibble(long)  | display-ready link-scale contrasts (logOddsRatio, p)    | emmContLnTc              | inline contrast text
+# contLnTcDisp    | tibble(long)  | display-ready link-scale contrasts (logOddsRatio, p)    | contLnTc              | inline contrast text
 
 # tcRes           | named list    | bundle of final test+control result tables              | objects above            | per-question filtering
 
@@ -195,7 +199,8 @@ emmPredCont <- map2(
     # cont <- pairs(emmCont) This is the alternative to running the custom contrast
 
     # For reporting, you may want both link-scale test and response-scale summary
-    contLink <- as.data.frame(cont) %>%
+    # infer T,T includes confint as well
+    contLink <- summary(cont, infer = c(T, T)) %>% 
       rename(logOddsRatio = estimate) %>%
       mutate(
         experiment = exp_id,
@@ -219,8 +224,9 @@ emmPredCont <- transpose(emmPredCont)
 # bind the elements within each list together
 emmPredCont <- map(emmPredCont, list_rbind)
 emmTcAll <- emmPredCont[["emmAll"]]
-emmContLnTc <- emmPredCont[["contLink"]]
+contLnTc <- emmPredCont[["contLink"]]
 emmContRspTc <- emmPredCont[["contResp"]]
+rm(list = c("emmPredCont"))
 
 # bring in the nat vs art variable
 emmTcAll <- left_join(
@@ -238,7 +244,6 @@ emmTcPts <- emmTcAll %>%
 # honestly i think the reality is actually that predict would work fine, because the other variables in the models hardly have effects?
 # and what if i just ran predict on the dataframe itself? didnt i do something like that initially?
 
-rm(list = c("emmPredCont"))
 ```
 
 ```{r formatMasterTables}
@@ -254,7 +259,7 @@ emmTestPtsDisp <- emmTestPts %>%
       rank_trial == 1 ~ "start",
       rank_trial == max(rank_trial, na.rm = TRUE) ~ "end",
       rank_trial > 1 & rank_trial < max(rank_trial, na.rm = TRUE) ~ "middle"),
-    probConfint = sprintf("%.3f [%.3f, %.3f]", prob, asymp.LCL, asymp.UCL)
+    probConfint = sprintf("%.3f %.3f-%.3f", prob, asymp.LCL, asymp.UCL)
     ) %>%
   # pivot the data wider to allow for easy indexing of table
   select(experiment, rank_trial, probConfint, trial_pos) %>%
@@ -263,12 +268,11 @@ emmTestPtsDisp <- emmTestPts %>%
 emmTestPtsDisp <- column_to_rownames(emmTestPtsDisp, "experiment")
 
 testRes <- list(
-  predAll = emmTestAll,
-  predPts = emmTestPts,
+  emmAll = emmTestAll,
+  emmPts = emmTestPts,
+  emmPtsDisp = emmTestPtsDisp,
   mCoefs = mTestTidy
 )
-
-rm(mTest)
 
 ################################
 
@@ -281,9 +285,9 @@ emmTcPtsDisp <- emmTcPts %>%
     trial_pos = case_when(
       rank_trial == 1 ~ "ctrlStart",
       rank_trial == max(rank_trial, na.rm = TRUE) ~ "testEnd"),
-    confintFmt = sprintf("[%.3f, %.3f]", asymp.LCL, asymp.UCL),
+    confintFmt = sprintf("%.3f-%.3f", asymp.LCL, asymp.UCL),
     probFmt = sprintf("%.3f", prob),
-    probConfint = sprintf("%.3f [%.3f, %.3f]", prob, asymp.LCL, asymp.UCL)
+    probConfint = sprintf("%.3f %.3f-%.3f", prob, asymp.LCL, asymp.UCL)
     ) %>%
   # pivot the data wider to allow for easy indexing of table
   select(experiment, rank_trial, probFmt, confintFmt, probConfint, trial_pos) %>%
@@ -295,15 +299,16 @@ emmTcPtsDisp <- column_to_rownames(emmTcPtsDisp, "experiment")
 
 # function also formats rank_trial (whole numbers that are numeric). Undesirable.
 source("functions/format_numeric_cols.R")
-emmContLnTc$pFmt <- scales::pvalue(emmContLnTc$p.value)
-contLnTcDisp <- fmtNumCols(emmContLnTc)
+contLnTc$pFmt <- scales::pvalue(contLnTc$p.value)
+contLnTcDisp <- fmtNumCols(contLnTc)
+contLnTcDisp$confint <- sprintf("%s-%s", contLnTcDisp$asymp.LCL, contLnTcDisp$asymp.UCL)
 
-emmContRspTc # add this to list of tables?
+emmContRspTc # add this to list of tables? !!!! NULL output??? 
 
 # c) model results
 mTcTidyDisp <- cbind(mTcTidy, pFmt = pvalue(mTcTidy$p.value, accuracy = 0.001))
 mTcTidyDisp <- fmtNumCols(mTcTidyDisp)
-mTcTidyDisp$confint <- paste(mTcTidyDisp$conf.low, mTcTidyDisp$conf.high, sep = ", ") 
+mTcTidyDisp$confint <- paste(mTcTidyDisp$conf.low, mTcTidyDisp$conf.high, sep = "-")
 
 # rename terms in modelResults so that they're easier to access in in-line results
 # alternative ways to do this are to assign variables new local names before the model:
@@ -322,17 +327,23 @@ mTcTidyDisp <- mTcTidyDisp %>%
 # but first rename
 mTcTidyWideDisp <- mTcTidyDisp %>% rename(est = estimate, pval = p.value) %>%
   # only keep columns interested in
-  select(term_label, est, pval, confint, experiment) %>%
+  select(term_label, est, pval, pFmt, confint, experiment) %>%
   pivot_wider(names_from = "term_label",
-              values_from = c("est", "pval", "confint"),
+              values_from = c("est", "pval", "pFmt", "confint"),
               names_glue  = "{term_label}_{.value}")
 
 tcRes <- list(
   mCoefsDisp = mTcTidyWideDisp,
   contrastsDisp = contLnTcDisp,
-  predPtsDisp = emmTcPtsDisp,
-  predAll = emmTcAll,
-  predPts = emmTcPts)
+  emmPtsDisp = emmTcPtsDisp,
+  emmAll = emmTcAll,
+  emmPts = emmTcPts)
+
+rm(
+  mTest, mTc, mTestTidy, emmTestAll, emmTestPts, emmTestPtsDisp,
+  mTcTidy, mTcTidyDisp, mTcTidyWideDisp, emmTcAll, emmTcPts, emmTcPtsDisp,
+  contLnTc, contLnTcDisp, emmContRspTc, term_labels
+)
 
 ```
 
@@ -354,10 +365,8 @@ tcRes <- list(
 
 ```
 
-
 ```{r buildRollingChoices}
 # create a rolling-mean dataframe so underlying raw-data can be visualised
-
 choices_rolling <- choices %>%
   arrange(rank_trial) %>%
   # keep nat or art along for the ride for easy subsetting later
@@ -381,7 +390,7 @@ choices_rolling <- choices %>%
 ```{r q1PlotAndFilterTables}
 
 q1ID <- "perpPara_170725"
-
+# this function allows you to subset not just by columns but also rownames
 tcResQ1 <- lapply(tcRes, function(x) {
   if ("experiment" %in% colnames(x)) {
     dplyr::filter(x, experiment == q1ID)
@@ -393,16 +402,14 @@ tcResQ1 <- lapply(tcRes, function(x) {
 })
 mCoefsDispQ1 <- tcResQ1$mCoefsDisp
 contrastsDispQ1 <- tcResQ1$contrastsDisp
-emmTcPtsDispQ1 <- tcResQ1$predPtsDisp
-predPtsQ1 <- tcResQ1$predPts
-predAllQ1 <- tcResQ1$predAll
+emmTcPtsDispQ1 <- tcResQ1$emmPtsDisp
+emmPtsQ1 <- tcResQ1$emmPts
+emmAllQ1 <- tcResQ1$emmAll
 
 df_rolling <- choices_rolling %>% filter(experiment == q1ID)
 
-p <- ggplot(data = predAllQ1, aes(x = rank_trial))+
+p <- ggplot(data = emmAllQ1, aes(x = rank_trial))+
   geom_ribbon(aes(ymin = asymp.LCL, ymax = asymp.UCL), alpha = 0.2) +
-  # geom_line(aes(y = asymp.LCL), lty = 5) +
-  # geom_line(aes(y = asymp.UCL), lty = 5) +
   geom_line(aes(x = rank_trial, y = prob)) +
   labs(x = "Trial", y = "% of decisions for reward")+
   scale_y_continuous(labels = scales::percent, breaks = seq(0, 1, by = 0.1))+
@@ -410,84 +417,44 @@ p <- ggplot(data = predAllQ1, aes(x = rank_trial))+
   custom_theme_text_enlarged+
   facet_wrap(vars(manipulation))
 
-p <- p + geom_point(data = predPtsQ1, aes(x = rank_trial, y = prob)) +
-  geom_errorbar(data = predPtsQ1,
+p <- p +
+    geom_errorbar(data = emmPtsQ1,
                 aes(x = rank_trial , ymin = asymp.LCL, ymax = asymp.UCL),
-                width= 2)
+                width= 2) +
+  geom_point(data = emmPtsQ1, aes(x = rank_trial, y = prob))
 
-p + geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr))
-
+p + geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr),
+               colour = "grey")
+emmTcPtsDispQ1$confintFmt_testEnd
+contrastsDispQ1
 ```
 
+During the test phase of the experiment, trial number (experience) had a significant positive effect on the expected probability (\Pcorr) of a correct decision (Figure 1 solid line) with every successive trial increasing the log odds of a correct decision by `r mCoefsDispQ1$trial_est` (95% CI `r mCoefsDispQ1$trial_confint`, p `r mCoefsDispQ1$trial_pFmt`). 
 
-For the test, trial number (experience) has a significant positive effect (slope) on the expected probability (\Pcorr) of correct a decision. The effect of trial on \Pcorr (or the 'slope') is `r mCoefsDispQ1$trial_est` (95% CI: `r mCoefsDispQ1$trial_confint`) - that is, the log odds of a correct decision increases by `r mCoefsDispQ1$trial_est` after every successive trial. 
+The \Pcorr of a correct choice at the end of the test was higher (\Pcorr = `r emmTcPtsDispQ1$probFmt_testEnd`, 95% CI `r emmTcPtsDispQ1$confintFmt_testEnd`) than at the start of the control (\Pcorr = `r emmTcPtsDispQ1$probFmt_ctrlStart`, 95% CI: `r emmTcPtsDispQ1$confintFmt_ctrlStart`), and this difference was significant (log odds ratio = `r contrastsDispQ1$logOddsRatio`, p `r contrastsDispQ1$pFmt`) (Figure 1, compare error bars between test and control panel).
 
-The \Pcorr of a correct choice at the end of the test was higher (`r emmTcPtsDispQ1[1, "probFmt_testEnd"]`) than at the start of the control (\Pcorr = `r emmTcPtsDispQ1[1, "probFmt_ctrlStart"]`, 95% CI: `r emmTcPtsDispQ1[1, "confintFmt_ctrlStart"]`), and this difference was significant (log odds ratio = `r contrastsDispQ1[1, "logOddsRatio"]`, p `r contrastsDispQ1$pFmt`).
-
-Also note that the \Pcorr for the test is estimated to be significantly above chance (95% confidence ribbon does not overlap the 50% line) for the entire duration of the test. In contrast, the pcorr in the control phase is never significantly above chance for the duration of the control (95% confidence ribbon overlaps the 50% line).
+Also note that \Pcorr is significantly above chance (95% confidence ribbon does not overlap the 50% line) from an early trial number and remains that way until the end of the test. In contrast, the \Pcorr in the control phase is never significantly above chance for the duration of the control (95% confidence ribbon overlaps the 50% line).
 
 That the model suggests naive wasps perform above chance at the onset of the test phase (ie. in trial 1) can be attributed to the fact that the model is unable to fit the rapid learning of the wasps, rather than to the availability and learning of olfactory and / or temporal cues during the pre-test training phase. This is supported by the proportion of correct decisions in the first few 3-trial wide windows of the test phase (black points) that are clustered around 50%.
 
-
-```{r q1OldCode}
-
-# # make the glm. 
-# # ToDo: include individual in a mixed model
-# perpPara_170725 <- choices[choices$experiment == "perpPara_170725",]
-# 
-# mPerpPara <- glm(decision ~ rank_trial * manipulation + sideAlt_trial + reward_side,
-#            data = perpPara_170725, family = binomial)
-# 
-# mTab <- tidy(mPerpPara, conf.int = TRUE) %>%
-#   mutate(across(where(is.numeric), ~ round(.x, 3)))
-# # summary(mod_perpPara)
-# 
-# perpPara_170725$pred_prob <- predict(mPerpPara, type = "response")
-# 
-# p <- ggplot(data = perpPara_170725)+
-#   geom_smooth(aes(x = rank_trial, y = pred_prob),
-#     method = "glm", method.args = list(family = binomial), alpha = 0.5)+
-#   labs(x = "Trial", y = "% of decisions for reward")+
-#   scale_y_continuous(labels = scales::percent, breaks = seq(0, 1, by = 0.1))+
-#   geom_hline(yintercept = 0.5, lty = 2, size = 1)+
-#   custom_theme_text_enlarged+
-#   facet_wrap(vars(manipulation))
-# 
-# # find and compare probabilities at end of test and start of control
-# # First get EMMs at both time points. emmeans creates a 'reference grid' # in essence this is like 'expand.grid' apparently
-# emmPerpPara <- emmeans(mPerpPara, ~ manipulation * rank_trial,
-#                at = list(rank_trial = c(1,47)), type = "response")
-# # View / print emm object to see the order/indices and specify custom contrasts
-# 
-# # keep only end of test and start of control so in line indexing and writing is less brittle
-# sumTab <- summary(emmPerpPara) %>% 
-#   filter(! manipulation == "test" & rank_trial == 1 |
-#            ! manipulation == "control" & rank_trial > 1 )
-# 
-# # add the predicted points and error bars to the plot
-# p <- p + geom_point(data = sumTab, aes(x = rank_trial, y = prob)) +
-#   geom_errorbar(data = sumTab,
-#                 aes(x = rank_trial , ymin = asymp.LCL, ymax = asymp.UCL),
-#                 width= 2)
-# # custom contrast: compare end of test (trial 47) to start of control (trial 1)
-# testTab <- as.data.frame(
-#   contrast(emmPerpPara, method = list(c(0,-1,1,0)), type = "response") 
-#   )
-# 
-# # Model appears to suggest above chance choices at onset of test.
-# # Add rolling mean bins to see raw data at start of test
-# df_rolling <- choices_rolling %>% filter(experiment == "perpPara_170725")
-# 
-# p + geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr))
-
-
-
+```{r q1Cleanup}
+rm(
+  q1ID, tcResQ1, mCoefsDispQ1, contrastsDispQ1,
+  emmTcPtsDispQ1, emmPtsQ1, emmAllQ1,
+  df_rolling, p
+)
 ```
 
 # Question 2: What information are wasps using to discriminate patterns? 
 - Do they need optic flow? 
 - Can they distinguish simple brightness differences? 
 - are there differences in performance among artificial stimuli?
+
+```{r}
+# filter so that only artificial canopies remain
+testRes
+
+```
 
 ```{r q2FitArtModel, eval=TRUE}
 
@@ -514,7 +481,7 @@ emmArt <- emmeans(art_glm, ~ rank_trial ,
                at = list(rank_trial = first_last_trials),
                          by = "experiment",
                type = "response") %>% as.data.frame()
-# with this function, you could probably also get around thed 'day issue' by mapping day to the function. That's if a reviewer insists on you including day as a factor in the analysis
+# with this function, you could probably also get around the 'day issue' by mapping day to the function. That's if a reviewer insists on you including day as a factor in the analysis
 # apparently this day issue would be solved by taking an overall experiment modelling approach and modelling day as a random effect
 emmArt <- map2(.x = first_last_trials, .y = names(first_last_trials),
      function(x, y){
@@ -568,7 +535,7 @@ p + geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr))
 # prettify tables for in-line results
 emmArt <- bind_rows(emmArt) %>%
   mutate(probFmt = round(prob, 3)) 
-emmArt$confint <- sprintf("[%.3f, %.3f]", emmArt[,"asymp.LCL"], emmArt[,"asymp.UCL"])
+emmArt$confint <- sprintf("%.3f-%.3f", emmArt[,"asymp.LCL"], emmArt[,"asymp.UCL"])
 
 emmArt <- emmArt %>%
   select(experiment, trial_pos, probFmt, confint) %>%
@@ -606,9 +573,9 @@ issues: - day is mulitcollinear in thin oblique experiment. It makes the slope o
 
 ```{r q3NaturalisticTest}
 
-emmNatTestAllTrials1 <- emmTestAll %>% filter(nat_or_art == "naturalistic")
-emmNatTestPts1 <- emmTestPts %>% filter(nat_or_art == "naturalistic")
-tbNatTestPts1 <- emmTestPtsDisp %>% filter(nat_or_art == "naturalistic")
+emmNatTestAllTrials1 <- testRes$emmAll %>% filter(nat_or_art == "naturalistic")
+emmNatTestPts1 <- testRes$emmPts %>% filter(nat_or_art == "naturalistic")
+tbNatTestPts1 <- testRes$emmPtsDisp %>% filter(nat_or_art == "naturalistic")
 
 p <- ggplot(emmNatTestAllTrials1, aes(x = rank_trial, y = prob, colour = experiment)) +
   geom_line() +
@@ -649,9 +616,9 @@ naturalistic test vs control
 
 # control comparison: compare the control to the test
 # bring in the predictions across all trials and the subset for end of test and start of control
-emmNatTcAll <- emmTcAll %>% filter(nat_or_art == "naturalistic")
-emmNatTcPts <- emmTcPts %>% filter(nat_or_art == "naturalistic")
-tbNatTcPts <- emmTcPtsDisp %>% filter(nat_or_art == "naturalistic")
+emmNatTcAll <- tcRes$emmAll %>% filter(nat_or_art == "naturalistic")
+emmNatTcPts <- tcRes$emmPts %>% filter(nat_or_art == "naturalistic")
+tbNatTcPts <- tcRes$emmPtsDisp %>% filter(nat_or_art == "naturalistic")
 
 expTestAndCtrl <- names(
   which(

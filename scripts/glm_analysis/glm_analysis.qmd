@@ -235,6 +235,13 @@ emmTcPts <- emmTcAll %>%
 
 
 ```{r formatTestDataStructures}
+
+# here we produce MS and inLine ready tables for: 
+# 1. contrasts,
+# 2. predictions at different points
+# 3. model coefficients 
+# 4. rank trial slope / effects
+
 source("functions/format_numeric_cols.R")
 source("functions/format_tables.R")
 
@@ -292,9 +299,6 @@ sourceFmt <- function(file) source(file.path(formattingTablesDir, file))
 
 sourceFmt("format_emmTcPts.R") # outputs inLine and MsTab objects
 sourceFmt("format_contTcLn.R") # outputs inLine and MsTab objects
-
-contTcRsp # add this to list of tables? !!!! NULL output???
-
 sourceFmt("format_mTcTidy.R") # outputs inLine and MsTab objects
 
 tcRes <- list(
@@ -645,8 +649,81 @@ ToDo:
 - naturalistic -> artificial transition experiment 
 
 # Supplementary  
-```{r}
-testRes$emmPtsMsTab
+```{r supplementaryMsTabs}
+
+# to do: 
+# table S1: round to 2 decimal places, combine middle trial number and end trial number columns
+# Table S2: break this up visually per experiment and order by nat or art 
+
+
+# arrange all experiments in tables by nat vs art column
+# change CI separation to use , or ;
+# merge logOdds and ci95 columns
+# merge contrast and pts predictions tables for tc data?
+# where is the control coefficient for tc model results?
+# abbreviate testEndTrial to TrEnd
+# Break up model results by experiment, stop repetition within experiment column
+# Proper table captions
+# - Numerate tables with s prefix
+
+# S1 formatting: round numeric text to 2 decimals, and merge middle/end trial cols
+roundNumsInString <- function(x, digits = 2) {
+  vapply(
+    x,
+    function(s) {
+      nums <- regmatches(s, gregexpr("-?[0-9]+\\.?[0-9]*", s, perl = TRUE))[[1]]
+      if (length(nums) == 0) {
+        return(s)
+      }
+      out <- s
+      rounded <- sprintf(paste0("%.", digits, "f"), as.numeric(nums))
+      for (i in seq_along(nums)) {
+        out <- sub(nums[i], rounded[i], out, fixed = TRUE)
+      }
+      out
+    },
+    character(1)
+  )
+}
+
+s1TestPtsMsTab <- testRes$emmPtsMsTab %>%
+  mutate(
+    across(
+      c(testStartPcorr95CI, testMidPcorr95CI, testEndPcorr95CI),
+      ~ roundNumsInString(.x, digits = 2)
+    ),
+    `mid, end trial #` = paste(middleTrial, testEndTrial, sep = ", ")
+  ) %>%
+  select(-middleTrial, -testEndTrial)
+
+
+suppMsTabs <- list(
+  "Test predictions at start, middle, and end trials" =
+    s1TestPtsMsTab,
+  "Test model coefficients" =
+    testRes$mCoefsMsTab,
+  "Test trial-slope summary" =
+    testRes$trialSlopeMsTab,
+  "Test-control contrast summary" =
+    tcRes$contrastsMsTab,
+  "Test-control predictions at test end and control start" =
+    tcRes$emmPtsMsTab,
+  "Test-control model coefficients" =
+    tcRes$mCoefsMsTab,
+  "Test-control trial-slope summary" =
+    tcRes$trialSlopeMsTab
+)
+
+purrr::iwalk(suppMsTabs, function(tbl, cap) {
+  print(
+    knitr::kable(
+      tbl,
+      caption = cap,
+      booktabs = TRUE
+    )
+  )
+  cat("\n\n")
+})
 
 
 ```

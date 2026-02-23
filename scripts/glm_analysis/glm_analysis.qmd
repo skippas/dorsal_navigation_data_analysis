@@ -82,7 +82,12 @@ mTest <- choices %>%
                data = .x, family = binomial))
 
 # get resuls into tidy format
-mTestTidy <- map_df(mTest, broom.mixed::tidy, conf.int = T, .id = "experiment")
+mTestTidy <- map_df(mTest, broom.mixed::tidy, conf.int = T, .id = "experiment") %>%
+  # bring in nat vs art variable
+  left_join(
+    unique(choices[, c("experiment", "nat_or_art")]),
+    by = "experiment"
+  ) 
 
 # find start, mid and end trials from emmeans
 emmTestAll <- map2(

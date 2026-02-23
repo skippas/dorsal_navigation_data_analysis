@@ -1,47 +1,29 @@
-mTestTidyInLine <- mTestTidy %>%
-  mutate(pFmt = pvalue(mTestTidy$p.value, accuracy = 0.001)) %>%
+mTestTidyFmt <- mTestTidy %>%
+  mutate(pFmt = pvalue(mTestTidy$p.value, accuracy = 0.001),
+         oddsMultiplier = sprintf("%.3f", exp(estimate))) %>%
   fmtNumCols() %>%
   mutate(
     confint = paste(conf.low, conf.high, sep = "-"),
-    term_label = recode(term, !!!term_labels)
-  )
+    term = recode(term, !!!term_labels)
+  ) %>%
+  arrange(nat_or_art, experiment)
+
+mTestTidyInLine <- mTestTidyFmt
 
 mTestTidyWideInLine <- mTestTidyInLine %>%
-  rename(est = estimate, pval = p.value) %>%
-  select(term_label, est, pval, pFmt, confint, experiment) %>%
+  select(term, estimate, p.value, pFmt, confint, experiment) %>% # why am i keeping p.value here?
   pivot_wider(
-    names_from = "term_label",
-    values_from = c("est", "pval", "pFmt", "confint"),
-    names_glue = "{term_label}_{.value}"
+    names_from = "term",
+    values_from = c("estimate", "p.value", "pFmt", "confint"),
+    names_glue = "{term}_{.value}"
   )
 
-mTestCoefsMsTab <- mTestTidy %>%
-  left_join(
-    unique(choices[, c("experiment", "nat_or_art")]),
-    by = "experiment"
-  ) %>%
-  transmute(
-    experiment, nat_or_art,
-    term = recode(term, !!!term_labels),
-    logOdds = sprintf("%.3f", estimate),
-    ci95 = sprintf("%.3f-%.3f", conf.low, conf.high),
-    pFmt = scales::pvalue(p.value, accuracy = 0.001)
-  )
+mTestCoefsMsTab <- mTestTidyFmt %>% 
+  select(experiment, nat_or_art, term, estimate, confint, pFmt)
 
-testTrialSlopeInLine <- mTestTidy %>%
+testTrialSlopeInLine <- mTestTidyFmt %>%
   filter(term == "rank_trial") %>%
-  left_join(
-    unique(choices[, c("experiment", "nat_or_art")]),
-    by = "experiment"
-  ) %>%
-  transmute(
-    experiment, nat_or_art,
-    trialLogOdds = sprintf("%.3f", estimate),
-    ci95 = sprintf("%.3f-%.3f", conf.low, conf.high),
-    pFmt = scales::pvalue(p.value, accuracy = 0.001),
-    oddsMultiplierPerTrial = sprintf("%.3f", exp(estimate))
-  ) %>%
-  arrange(nat_or_art, experiment) %>%
+  select(experiment, nat_or_art, estimate, confint, pFmt, oddsMultiplier) %>%
   tibble::column_to_rownames("experiment")
 
 testTrialSlopeMsTab <- testTrialSlopeInLine %>%

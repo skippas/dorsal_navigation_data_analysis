@@ -235,7 +235,30 @@ emmTcPts <- emmTcAll %>%
 
 
 ```{r formatTestDataStructures}
-source("scripts/glm_analysis/formatting_tables/format_test_tables.R")
+source("functions/format_numeric_cols.R")
+source("functions/format_tables.R")
+
+term_labels <- c(
+  "(Intercept)"      = "int",
+  "rank_trial"       = "trial",
+  "reward_sideRight" = "sideR",
+  "sideAlt_trialTRUE" = "sideAltT"
+)
+
+formattingTablesDir <- "scripts/glm_analysis/formatting_tables"
+sourceFmt <- function(file) source(file.path(formattingTablesDir, file))
+
+sourceFmt("format_emmTestPtsInLine.R")
+sourceFmt("format_mTestTidyInLine.R")
+sourceFmt("format_mTestTidyWideInLine.R")
+sourceFmt("format_testTrialSlopeInLine.R")
+sourceFmt("format_emmTestPtsMsTab.R")
+sourceFmt("format_testTrialSlopeMsTab.R")
+sourceFmt("format_mTestCoefsMsTab.R")
+sourceFmt("format_testRes.R") # maybe this needs to come into main script?
+sourceFmt("format_test_cleanup.R")
+
+rm(sourceFmt, formattingTablesDir)
 
 ```
 

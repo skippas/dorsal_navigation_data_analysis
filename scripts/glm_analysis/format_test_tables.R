@@ -52,19 +52,7 @@ mTestTidyWideInLine <- mTestTidyInLine %>%
     names_glue = "{term_label}_{.value}"
   )
 
-# 2. MS table formatting
-
-# test-phase points MS table
-emmTestPtsMsTab <- emmTestPtsInLine %>%
-  tibble::rownames_to_column("experiment") %>%
-  transmute(
-    experiment,
-    testStartPcorr95CI = sprintf("%s (%s)", first_probFmt, first_confintFmt),
-    testMidPcorr95CI = sprintf("%s (%s)", middle_probFmt, middle_confintFmt),
-    testEndPcorr95CI = sprintf("%s (%s)", last_probFmt, last_confintFmt),
-    middleTrial = middle_rank_trial,
-    testEndTrial = last_rank_trial
-  )
+# c) slope inLine table
 
 testTrialSlopeInLine <- mTestTidy %>%
   filter(term == "rank_trial") %>%
@@ -81,6 +69,20 @@ testTrialSlopeInLine <- mTestTidy %>%
   ) %>%
   arrange(nat_or_art, experiment) %>%
   tibble::column_to_rownames("experiment")
+
+# 2. MS table formatting
+
+# test-phase points MS table
+emmTestPtsMsTab <- emmTestPtsInLine %>%
+  tibble::rownames_to_column("experiment") %>%
+  transmute(
+    experiment,
+    testStartPcorr95CI = sprintf("%s (%s)", first_probFmt, first_confintFmt),
+    testMidPcorr95CI = sprintf("%s (%s)", middle_probFmt, middle_confintFmt),
+    testEndPcorr95CI = sprintf("%s (%s)", last_probFmt, last_confintFmt),
+    middleTrial = middle_rank_trial,
+    testEndTrial = last_rank_trial
+  )
 
 # test slope MS table
 testTrialSlopeMsTab <- testTrialSlopeInLine %>%

@@ -245,7 +245,7 @@ term_labels <- c(
   "sideAlt_trialTRUE" = "sideAltT"
 )
 
-formattingTablesDir <- "scripts/glm_analysis/formatting_tables"
+formattingTablesDir <- "scripts/glm_analysis/formatting_tables/test"
 sourceFmt <- function(file) source(file.path(formattingTablesDir, file))
 
 sourceFmt("format_emmTestPtsInLine.R")
@@ -255,7 +255,7 @@ sourceFmt("format_testTrialSlopeInLine.R")
 sourceFmt("format_emmTestPtsMsTab.R")
 sourceFmt("format_testTrialSlopeMsTab.R")
 sourceFmt("format_mTestCoefsMsTab.R")
-sourceFmt("format_testRes.R") # maybe this needs to come into main script?
+sourceFmt("format_testRes.R")
 sourceFmt("format_test_cleanup.R")
 
 rm(sourceFmt, formattingTablesDir)
@@ -264,37 +264,9 @@ rm(sourceFmt, formattingTablesDir)
 
 
 ```{r formatTcDataStructures}
+source("functions/format_numeric_cols.R")
+source("functions/format_tables.R")
 
-# 1. InLine formatting of pts, contrast and model data
-
-# a) test + ctrl pts results
-emmTcPtsInLine <- emmTcPts %>%
-  group_by(experiment, nat_or_art) %>%
-  # add a 'trial pos' variable that will make indexing table easier:
-  mutate(
-    trial_pos = case_when(
-      rank_trial == 1 ~ "ctrlStart",
-      rank_trial == max(rank_trial, na.rm = TRUE) ~ "testEnd"),
-    confintFmt = sprintf("%.3f-%.3f", asymp.LCL, asymp.UCL),
-    probFmt = sprintf("%.3f", prob),
-    probConfint = sprintf("%.3f (%.3f-%.3f)", prob, asymp.LCL, asymp.UCL)
-    ) %>%
-  # pivot the data wider to allow for easy indexing of table
-  select(experiment, rank_trial, probFmt, confintFmt, probConfint, trial_pos) %>%
-  pivot_wider(names_from = trial_pos,
-              values_from = c(probFmt, confintFmt, probConfint, rank_trial)) 
-emmTcPtsInLine <- column_to_rownames(emmTcPtsInLine, "experiment")
-
-# b) test vs ctrl contrast results
-# function also formats rank_trial (whole numbers that are numeric). Undesirable.
-contTcLnInLine <- contTcLn %>%
-  mutate(pFmt = pvalue(p.value)) %>%
-  fmtNumCols() %>%
-  mutate(confint = paste(asymp.LCL, asymp.UCL, sep = "-"))
-
-contTcRsp # add this to list of tables? !!!! NULL output??? 
-
-# c) model results
 term_labels <- c(
   "(Intercept)"      = "int",
   "rank_trial"       = "trial",
@@ -302,102 +274,25 @@ term_labels <- c(
   "sideAlt_trialTRUE" = "sideAltT"
 )
 
-mTcTidyInLine <- mTcTidy %>%
-  mutate(pFmt = pvalue(mTcTidy$p.value, accuracy = 0.001)) %>%
-  fmtNumCols() %>%
-  mutate(confint = paste(conf.low, conf.high, sep = "-"),
-         term_label = recode(term, !!!term_labels))
-# pivot wider to make in line results easier to write / access
-# but first rename
-mTcTidyWideInLine <- mTcTidyInLine %>% 
-  rename(est = estimate, pval = p.value) %>%
-  select(term_label, est, pval, pFmt, confint, experiment) %>%
-  pivot_wider(names_from = "term_label",
-              values_from = c("est", "pval", "pFmt", "confint"),
-              names_glue  = "{term_label}_{.value}")
+formattingTablesDir <- "scripts/glm_analysis/formatting_tables/tc"
+sourceFmt <- function(file) source(file.path(formattingTablesDir, file))
 
-# 2. creating MS tables from data structures
-# the conversion from in-line to msTab should be very few lines, refactor.
+sourceFmt("format_emmTcPtsInLine.R")
+sourceFmt("format_contTcLnInLine.R")
 
-#so ive got an 'inline' contrast table. i want this to form another mstab (can just put it below the last table we made) with the columns of experiment, logoddsratio and confidence interval, and pFmt. 
-# contrast MS table
-contTcLnMsTab <- contTcLnInLine %>% 
-  transmute(
-    experiment,
-    logOddsRatio,
-    ci95 = confint,
-    pFmt,
-    controlStartTrial = control_start,
-    testEndTrial = test_end
-  )
+contTcRsp # add this to list of tables? !!!! NULL output???
 
-# test vs ctrl points MS table
-emmTcPtsMsTab <- emmTcPtsInLine %>%
-  tibble::rownames_to_column("experiment") %>%
-  transmute(
-    experiment,
-    controlStartPcorr95CI = probConfint_ctrlStart,
-    testEndPcorr95CI = probConfint_testEnd,
-    testEndTrial = rank_trial_testEnd
-  )
+sourceFmt("format_mTcTidyInLine.R")
+sourceFmt("format_mTcTidyWideInLine.R")
+sourceFmt("format_contTcLnMsTab.R")
+sourceFmt("format_emmTcPtsMsTab.R")
+sourceFmt("format_tcTrialSlopeInLine.R")
+sourceFmt("format_tcTrialSlopeMsTab.R")
+sourceFmt("format_mTcCoefsMsTab.R")
+sourceFmt("format_tcRes.R")
+sourceFmt("format_tc_cleanup.R")
 
-# slope coefficent MS table
-tcTrialSlopeInLine <- mTcTidy %>%
-  filter(term == "rank_trial") %>%
-  left_join(
-    unique(choices[, c("experiment", "nat_or_art")]),
-    by = "experiment"
-  ) %>%
-  transmute(
-    experiment, nat_or_art,
-    trialLogOdds = sprintf("%.3f", estimate),
-    ci95 = sprintf("%.3f-%.3f", conf.low, conf.high),
-    pFmt = scales::pvalue(p.value, accuracy = 0.001),
-    oddsMultiplierPerTrial = sprintf("%.3f", exp(estimate))
-  ) %>%
-  arrange(nat_or_art, experiment) %>%
-  tibble::column_to_rownames("experiment")
-
-# test+control slope MS table
-tcTrialSlopeMsTab <- tcTrialSlopeInLine %>%
-  tibble::rownames_to_column("experiment")
-
-# test+control model-coefficient MS table
-mTcCoefsMsTab <- mTcTidy %>%
-  left_join(
-    unique(choices[, c("experiment", "nat_or_art")]),
-    by = "experiment"
-  ) %>%
-  transmute(
-    experiment, nat_or_art,
-    term = recode(term, !!!term_labels),
-    logOdds = sprintf("%.3f", estimate),
-    ci95 = sprintf("%.3f-%.3f", conf.low, conf.high),
-    pFmt = scales::pvalue(p.value, accuracy = 0.001)
-  )
-
-# clean up
-
-tcRes <- list(
-  mCoefsInLine = mTcTidyWideInLine,
-  mCoefsMsTab = mTcCoefsMsTab,
-  contrastsInLine = contTcLnInLine,
-  contrastsMsTab = contTcLnMsTab,
-  emmPtsInLine = emmTcPtsInLine,
-  emmPtsMsTab = emmTcPtsMsTab,
-  emmAll = emmTcAll,
-  emmPts = emmTcPts,
-  trialSlopeInLine = tcTrialSlopeInLine,
-  trialSlopeMsTab = tcTrialSlopeMsTab)
-
-# clean up objects created in this chunk
-rm(
-  mTc, mTcTidy, mTcTidyInLine, mTcTidyWideInLine,
-  tcTrialSlopeInLine, tcTrialSlopeMsTab, mTcCoefsMsTab,
-  emmTcAll, emmTcPts, emmTcPtsInLine,
-  contTcLn, contTcLnInLine, contTcLnMsTab, contTcRsp,
-  term_labels
-)
+rm(sourceFmt, formattingTablesDir)
 
 ```
 

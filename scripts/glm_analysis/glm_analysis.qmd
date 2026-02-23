@@ -248,8 +248,9 @@ term_labels <- c(
 formattingTablesDir <- "scripts/glm_analysis/formatting_tables/test"
 sourceFmt <- function(file) source(file.path(formattingTablesDir, file))
 
-sourceFmt("format_emmTestPts.R") # outputs inLine and MsTab objects
-sourceFmt("format_mTestTidy.R") # outputs inLine and MsTab objects 
+sourceFmt("format_emmTestPts.R") # outputs inLine and MsTab objects 
+# outputs inLine and MsTab objects for slope and model generally
+sourceFmt("format_mTestTidy.R") 
 
 testRes <- list(
   emmAll = emmTestAll,
@@ -289,20 +290,33 @@ term_labels <- c(
 formattingTablesDir <- "scripts/glm_analysis/formatting_tables/tc"
 sourceFmt <- function(file) source(file.path(formattingTablesDir, file))
 
-sourceFmt("format_emmTcPtsInLine.R")
-sourceFmt("format_contTcLnInLine.R")
+sourceFmt("format_emmTcPts.R") # outputs inLine and MsTab objects
+sourceFmt("format_contTcLn.R") # outputs inLine and MsTab objects
 
 contTcRsp # add this to list of tables? !!!! NULL output???
 
-sourceFmt("format_mTcTidyInLine.R")
-sourceFmt("format_mTcTidyWideInLine.R")
-sourceFmt("format_contTcLnMsTab.R")
-sourceFmt("format_emmTcPtsMsTab.R")
-sourceFmt("format_tcTrialSlopeInLine.R")
-sourceFmt("format_tcTrialSlopeMsTab.R")
-sourceFmt("format_mTcCoefsMsTab.R")
-sourceFmt("format_tcRes.R")
-sourceFmt("format_tc_cleanup.R")
+sourceFmt("format_mTcTidy.R") # outputs inLine and MsTab objects
+
+tcRes <- list(
+  mCoefsInLine = mTcTidyWideInLine,
+  mCoefsMsTab = mTcCoefsMsTab,
+  contrastsInLine = contTcLnInLine,
+  contrastsMsTab = contTcLnMsTab,
+  emmPtsInLine = emmTcPtsInLine,
+  emmPtsMsTab = emmTcPtsMsTab,
+  emmAll = emmTcAll,
+  emmPts = emmTcPts,
+  trialSlopeInLine = tcTrialSlopeInLine,
+  trialSlopeMsTab = tcTrialSlopeMsTab
+)
+
+rm(
+  mTc, mTcTidy, mTcTidyInLine, mTcTidyWideInLine,
+  tcTrialSlopeInLine, tcTrialSlopeMsTab, mTcCoefsMsTab,
+  emmTcAll, emmTcPts, emmTcPtsInLine,
+  contTcLn, contTcLnInLine, contTcLnMsTab, contTcRsp,
+  term_labels
+)
 
 rm(sourceFmt, formattingTablesDir)
 

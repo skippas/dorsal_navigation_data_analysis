@@ -248,13 +248,8 @@ term_labels <- c(
 formattingTablesDir <- "scripts/glm_analysis/formatting_tables/test"
 sourceFmt <- function(file) source(file.path(formattingTablesDir, file))
 
-sourceFmt("format_emmTestPtsInLine.R")
-sourceFmt("format_mTestTidyInLine.R")
-sourceFmt("format_mTestTidyWideInLine.R")
-sourceFmt("format_testTrialSlopeInLine.R")
-sourceFmt("format_emmTestPtsMsTab.R")
-sourceFmt("format_testTrialSlopeMsTab.R")
-sourceFmt("format_mTestCoefsMsTab.R")
+sourceFmt("format_emmTestPts.R")
+sourceFmt("format_mTestTidy.R")
 sourceFmt("format_testRes.R")
 sourceFmt("format_test_cleanup.R")
 

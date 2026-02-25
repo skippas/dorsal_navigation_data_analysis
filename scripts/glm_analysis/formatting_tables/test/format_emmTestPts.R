@@ -1,30 +1,41 @@
-emmTestPtsInLine <- emmTestPts %>%
+emmTestPtsWide <- emmTestPts %>%
   group_by(experiment, nat_or_art) %>%
   mutate(
     trial_pos = case_when(
-      rank_trial == 1 ~ "first",
+      rank_trial == min(rank_trial, na.rm = TRUE) ~ "first",
       rank_trial == max(rank_trial, na.rm = TRUE) ~ "last",
-      rank_trial > 1 & rank_trial < max(rank_trial, na.rm = TRUE) ~ "middle"
-    ),
-    probFmt = sprintf("%.3f", prob),
-    confintFmt = sprintf("%.3f-%.3f", asymp.LCL, asymp.UCL)
+      TRUE ~ "middle"
+    )
   ) %>%
-  select(experiment, nat_or_art, rank_trial, probFmt, confintFmt, trial_pos) %>%
+  ungroup() %>%
+  fmtNumCols() %>%
+  make_confint_col(
+    lower_col = "asymp.LCL",
+    upper_col = "asymp.UCL",
+    out_col = "confint"
+  ) %>%
+  select(experiment, nat_or_art, rank_trial, prob, confint, trial_pos) %>%
   pivot_wider(
     names_from = trial_pos,
-    values_from = c(probFmt, confintFmt, rank_trial),
+    values_from = c(prob, confint, rank_trial),
     names_glue = "{trial_pos}_{.value}"
   )
 
-emmTestPtsInLine <- column_to_rownames(emmTestPtsInLine, "experiment")
+emmTestPtsInLine <- emmTestPtsWide %>%
+  column_to_rownames("experiment")
 
-emmTestPtsMsTab <- emmTestPtsInLine %>%
-  tibble::rownames_to_column("experiment") %>%
+emmTestPtsMsTab <- emmTestPtsWide %>%
   transmute(
     experiment,
-    testStartPcorr95CI = sprintf("%s (%s)", first_probFmt, first_confintFmt),
-    testMidPcorr95CI = sprintf("%s (%s)", middle_probFmt, middle_confintFmt),
-    testEndPcorr95CI = sprintf("%s (%s)", last_probFmt, last_confintFmt),
+    startPcorr95CI = sprintf("%s %s", first_prob, first_confint),
+    midPcorr95CI = sprintf("%s %s", middle_prob, middle_confint),
+    endPcorr95CI = sprintf("%s %s", last_prob, last_confint),
     middleTrial = middle_rank_trial,
-    testEndTrial = last_rank_trial
+    endTrial = last_rank_trial
   )
+# to do: remove all these test prefixes from emmtestptsmstab variable names
+# change sig digits to 2
+# begin refactoring tc formatting files
+# add all table captions and figure captions
+# where is manipulation term gone in tc results?
+# write q3 results

@@ -1,29 +1,30 @@
 mTestTidyFmt <- mTestTidy %>%
-  mutate(pFmt = pvalue(mTestTidy$p.value, accuracy = 0.001),
-         oddsMultiplier = sprintf("%.3f", exp(estimate))) %>%
-  fmtNumCols() %>%
+  rename(logOdds = estimate) %>%
   mutate(
-    confint = paste(conf.low, conf.high, sep = "-"),
-    term = recode(term, !!!term_labels)
+    pFmt = pvalue(mTestTidy$p.value, accuracy = 0.001),
+    oddsMultiplier = exp(logOdds)
   ) %>%
+  fmtNumCols() %>%
+  make_confint_col() %>%
+#  mutate(term = recode(term, !!!term_labels)) %>% not sure i want to recode the terms
   arrange(nat_or_art, experiment)
 
 mTestTidyInLine <- mTestTidyFmt
 
 mTestTidyWideInLine <- mTestTidyInLine %>%
-  select(term, estimate, p.value, pFmt, confint, experiment) %>% # why am i keeping p.value here?
+  select(term, logOdds, p.value, pFmt, confint, experiment) %>% # why am i keeping p.value here?
   pivot_wider(
     names_from = "term",
-    values_from = c("estimate", "p.value", "pFmt", "confint"),
+    values_from = c("logOdds", "p.value", "pFmt", "confint"),
     names_glue = "{term}_{.value}"
   )
 
 mTestCoefsMsTab <- mTestTidyFmt %>% 
-  select(experiment, nat_or_art, term, estimate, confint, pFmt)
+  select(experiment, nat_or_art, term, logOdds, confint, pFmt)
 
 testTrialSlopeInLine <- mTestTidyFmt %>%
   filter(term == "rank_trial") %>%
-  select(experiment, nat_or_art, estimate, confint, pFmt, oddsMultiplier) %>%
+  select(experiment, nat_or_art, logOdds, confint, pFmt, oddsMultiplier) %>%
   tibble::column_to_rownames("experiment")
 
 testTrialSlopeMsTab <- testTrialSlopeInLine %>%

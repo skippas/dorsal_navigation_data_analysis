@@ -248,6 +248,7 @@ emmTcPts <- emmTcAll %>%
 # 4. rank trial slope / effects
 
 source("functions/format_numeric_cols.R")
+source("functions/make_confint_col.R")
 source("functions/format_tables.R")
 
 term_labels <- c(
@@ -290,6 +291,7 @@ rm(sourceFmt, formattingTablesDir)
 
 ```{r formatTcDataStructures}
 source("functions/format_numeric_cols.R")
+source("functions/make_confint_col.R")
 source("functions/format_tables.R")
 
 term_labels <- c(
@@ -409,13 +411,13 @@ p <- p +
 
 p + geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr),
                colour = "grey")
-emmTcPtsInLineQ1$confintFmt_testEnd
+emmTcPtsInLineQ1$confint_testEnd
 contrastsInLineQ1
 ```
 
 During the test phase of the experiment, trial number (experience) had a significant positive effect on the expected probability (\Pcorr) of a correct decision (Figure 1 solid line) with every successive trial increasing the log odds of a correct decision by `r mCoefsInLineQ1$trial_est` (95% CI `r mCoefsInLineQ1$trial_confint`, p `r mCoefsInLineQ1$trial_pFmt`).
 
-The \Pcorr of a correct choice at the end of the test was higher (\Pcorr = `r emmTcPtsInLineQ1$probFmt_testEnd`, 95% CI `r emmTcPtsInLineQ1$confintFmt_testEnd`) than at the start of the control (\Pcorr = `r emmTcPtsInLineQ1$probFmt_ctrlStart`, 95% CI: `r emmTcPtsInLineQ1$confintFmt_ctrlStart`), and this difference was significant (log odds ratio = `r contrastsInLineQ1$logOddsRatio`, p `r contrastsInLineQ1$pFmt`) (Figure 1, compare error bars between test and control panel).
+The \Pcorr of a correct choice at the end of the test was higher (\Pcorr = `r emmTcPtsInLineQ1$prob_testEnd`, 95% CI `r emmTcPtsInLineQ1$confint_testEnd`) than at the start of the control (\Pcorr = `r emmTcPtsInLineQ1$prob_ctrlStart`, 95% CI: `r emmTcPtsInLineQ1$confint_ctrlStart`), and this difference was significant (log odds ratio = `r contrastsInLineQ1$logOddsRatio`, p `r contrastsInLineQ1$pFmt`) (Figure 1, compare error bars between test and control panel).
 
 Also note that \Pcorr is significantly above chance (95% confidence ribbon does not overlap the 50% line) from an early trial number and remains that way until the end of the test. In contrast, the \Pcorr in the control phase is never significantly above chance for the duration of the control (95% confidence ribbon overlaps the 50% line).
 
@@ -482,9 +484,9 @@ formatSlopeTable(
 
 To answer whether wasps require optic flow information to discriminate patterns we tested whether they could distinguish between oblique stripes oriented at 45 degrees to the right or left of the y-maze arm's long axis and the general direction of wasp travel. 
 
-Wasps had no trouble distinguishing between oblique stripes that presumably produce identical rates of optic flow in the dorsal visual field (Figure 2). Similar to the perpendicular-parallel experiment, trial had a significant positive effect on \Pcorr, with every successive trial increasing the log odds of a correct decision by `r q2TrialSlopeTable["thinOb_150823", "trialLogOdds"]` (95% CI `r q2TrialSlopeTable["thinOb_150823", "ci95"]`, p `r q2TrialSlopeTable["thinOb_150823", "pFmt"]`; Table 1). Initially (at trial 1) performance was not significantly different from chance (\Pcorr = `r emmArt["thinOb_150823", "first_probFmt"]`, 95% CI: `r emmArt["thinOb_150823", "first_confintFmt"]`) but rose steeply, reaching `r emmArt["thinOb_150823", "last_probFmt"]` (95% CI: `r emmArt["thinOb_150823", "last_confintFmt"]`) by the end of the experiment (trial 66), which is significantly higher than expected by chance (50%).
+Wasps had no trouble distinguishing between oblique stripes that presumably produce identical rates of optic flow in the dorsal visual field (Figure 2). Similar to the perpendicular-parallel experiment, trial had a significant positive effect on \Pcorr, with every successive trial increasing the log odds of a correct decision by `r q2TrialSlopeTable["thinOb_150823", "logOdds"]` (95% CI `r q2TrialSlopeTable["thinOb_150823", "confint"]`, p `r q2TrialSlopeTable["thinOb_150823", "pFmt"]`; Table 1). Initially (at trial 1) performance was not significantly different from chance (\Pcorr = `r emmArt["thinOb_150823", "first_prob"]`, 95% CI: `r emmArt["thinOb_150823", "first_confint"]`) but rose steeply, reaching `r emmArt["thinOb_150823", "last_prob"]` (95% CI: `r emmArt["thinOb_150823", "last_confint"]`) by the end of the experiment (trial 66), which is significantly higher than expected by chance (50%).
 
-Next, we asked whether wasps could discriminate between an opaque and transparent roof, ie. between stimuli that carried little to no pattern information. While trial had a positive effect on \Pcorr (beta = `r q2TrialSlopeTable["brightDiff_250725", "trialLogOdds"]`, 95% CI `r q2TrialSlopeTable["brightDiff_250725", "ci95"]`), unlike for the other two pairs of artificial stimuli this effect was not significant (p = `r q2TrialSlopeTable["brightDiff_250725", "pFmt"]`), likely due to the much shorter number of trials this experiment was run for. While statistical support for a positive slope is lacking, there is support for \Pcorr > 50% towards the middle and end of the experiment. At the onset of the experiment (trial 1), wasp performance was not significantly different from 50% (\Pcorr = `r emmArt["brightDiff_250725", "first_probFmt"]`, 95% CI: `r emmArt["brightDiff_250725", "first_confintFmt"]`))  but rises with experience and by the end of the experiment (trial 26) \Pcorr reached `r emmArt["brightDiff_250725", "last_probFmt"]` (95% CI: `r emmArt["brightDiff_250725", "last_confintFmt"]`). Performance at the end of the experiment is only borderline significantly higher than 50% because of the increased uncertainty in the slope / effect of trials on performance due to the lower number of trials run in this experiment. However, if one uses other metrics or analyses to compare performance to the 50% line, they are significantly different (for example, comparing performance at an intermediate trial or comparing the average performance of the last five trials to the 50% line).
+Next, we asked whether wasps could discriminate between an opaque and transparent roof, ie. between stimuli that carried little to no pattern information. While trial had a positive effect on \Pcorr (beta = `r q2TrialSlopeTable["brightDiff_250725", "logOdds"]`, 95% CI `r q2TrialSlopeTable["brightDiff_250725", "confint"]`), unlike for the other two pairs of artificial stimuli this effect was not significant (p = `r q2TrialSlopeTable["brightDiff_250725", "pFmt"]`), likely due to the much shorter number of trials this experiment was run for. While statistical support for a positive slope is lacking, there is support for \Pcorr > 50% towards the middle and end of the experiment. At the onset of the experiment (trial 1), wasp performance was not significantly different from 50% (\Pcorr = `r emmArt["brightDiff_250725", "first_prob"]`, 95% CI: `r emmArt["brightDiff_250725", "first_confint"]`))  but rises with experience and by the end of the experiment (trial 26) \Pcorr reached `r emmArt["brightDiff_250725", "last_prob"]` (95% CI: `r emmArt["brightDiff_250725", "last_confint"]`). Performance at the end of the experiment is only borderline significantly higher than 50% because of the increased uncertainty in the slope / effect of trials on performance due to the lower number of trials run in this experiment. However, if one uses other metrics or analyses to compare performance to the 50% line, they are significantly different (for example, comparing performance at an intermediate trial or comparing the average performance of the last five trials to the 50% line).
 
 NBNB! Slope or brightdiff exp not significant. fade best fit line?
 
@@ -538,7 +540,7 @@ q3NatTestPtsTable <- testRes$emmPtsMsTab %>%
     by = "experiment"
   ) %>%
   filter(nat_or_art == "naturalistic") %>%
-  select(-c(middleTrial, testMidPcorr95CI))
+  select(-c(middleTrial, midPcorr95CI))
 
 knitr::kable(
   q3NatTestPtsTable,
@@ -694,12 +696,12 @@ roundNumsInString <- function(x, digits = 2) {
 s1TestPtsMsTab <- testRes$emmPtsMsTab %>%
   mutate(
     across(
-      c(testStartPcorr95CI, testMidPcorr95CI, testEndPcorr95CI),
+      c(startPcorr95CI, midPcorr95CI, endPcorr95CI),
       ~ roundNumsInString(.x, digits = 2)
     ),
-    `mid, end trial #` = paste(middleTrial, testEndTrial, sep = ", ")
+    `mid, end trial #` = paste(middleTrial, endTrial, sep = ", ")
   ) %>%
-  select(-middleTrial, -testEndTrial)
+  select(-middleTrial, -endTrial)
 
 
 suppMsTabs <- list(

@@ -5,14 +5,14 @@ emmTcPtsInLine <- emmTcPts %>%
       rank_trial == 1 ~ "ctrlStart",
       rank_trial == max(rank_trial, na.rm = TRUE) ~ "testEnd"
     ),
-    confintFmt = sprintf("%.3f-%.3f", asymp.LCL, asymp.UCL),
-    probFmt = sprintf("%.3f", prob),
-    probConfint = sprintf("%.3f (%.3f-%.3f)", prob, asymp.LCL, asymp.UCL)
+    confint = sprintf("%.3f-%.3f", asymp.LCL, asymp.UCL),
+    prob = sprintf("%.3f", prob),
+    probConfint = sprintf("%s (%.3f-%.3f)", prob, asymp.LCL, asymp.UCL)
   ) %>%
-  select(experiment, rank_trial, probFmt, confintFmt, probConfint, trial_pos) %>%
+  select(experiment, rank_trial, prob, confint, probConfint, trial_pos) %>%
   pivot_wider(
     names_from = trial_pos,
-    values_from = c(probFmt, confintFmt, probConfint, rank_trial)
+    values_from = c(prob, confint, probConfint, rank_trial)
   )
 
 emmTcPtsInLine <- column_to_rownames(emmTcPtsInLine, "experiment")

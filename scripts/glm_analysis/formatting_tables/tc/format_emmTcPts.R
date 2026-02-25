@@ -1,27 +1,32 @@
-emmTcPtsInLine <- emmTcPts %>%
+emmTcPtsWide <- emmTcPts %>%
   group_by(experiment, nat_or_art) %>%
   mutate(
     trial_pos = case_when(
-      rank_trial == 1 ~ "ctrlStart",
+      rank_trial == min(rank_trial, na.rm = TRUE) ~ "ctrlStart",
       rank_trial == max(rank_trial, na.rm = TRUE) ~ "testEnd"
-    ),
-    confint = sprintf("%.3f-%.3f", asymp.LCL, asymp.UCL),
-    prob = sprintf("%.3f", prob),
-    probConfint = sprintf("%s (%.3f-%.3f)", prob, asymp.LCL, asymp.UCL)
+    )
   ) %>%
-  select(experiment, rank_trial, prob, confint, probConfint, trial_pos) %>%
+  filter(!is.na(trial_pos)) %>%
+  ungroup() %>%
+  fmtNumCols() %>%
+  make_confint_col(
+    lower_col = "asymp.LCL",
+    upper_col = "asymp.UCL",
+    out_col = "confint"
+  ) %>%
+  select(experiment, nat_or_art, rank_trial, prob, confint, trial_pos) %>%
   pivot_wider(
     names_from = trial_pos,
-    values_from = c(prob, confint, probConfint, rank_trial)
+    values_from = c(prob, confint, rank_trial)
   )
 
-emmTcPtsInLine <- column_to_rownames(emmTcPtsInLine, "experiment")
+emmTcPtsInLine <- emmTcPtsWide %>%
+  column_to_rownames("experiment")
 
-emmTcPtsMsTab <- emmTcPtsInLine %>%
-  tibble::rownames_to_column("experiment") %>%
+emmTcPtsMsTab <- emmTcPtsWide %>%
   transmute(
-    experiment,
-    controlStartPcorr95CI = probConfint_ctrlStart,
-    testEndPcorr95CI = probConfint_testEnd,
+    experiment, nat_or_art,
+    controlStartPcorr95CI = sprintf("%s %s", prob_ctrlStart, confint_ctrlStart),
+    testEndPcorr95CI = sprintf("%s %s", prob_testEnd, confint_testEnd),
     testEndTrial = rank_trial_testEnd
   )

@@ -26,14 +26,14 @@ emmTestPtsInLine <- emmTestPtsWide %>%
 
 emmTestPtsMsTab <- emmTestPtsWide %>%
   transmute(
-    experiment,
+    experiment, nat_or_art,
     startPcorr95CI = sprintf("%s %s", first_prob, first_confint),
     midPcorr95CI = sprintf("%s %s", middle_prob, middle_confint),
     endPcorr95CI = sprintf("%s %s", last_prob, last_confint),
     middleTrial = middle_rank_trial,
     endTrial = last_rank_trial
   )
-# to do: remove all these test prefixes from emmtestptsmstab variable names
+# to do:
 # change sig digits to 2
 # begin refactoring tc formatting files
 # add all table captions and figure captions

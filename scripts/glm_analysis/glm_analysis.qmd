@@ -324,6 +324,7 @@ tcRes <- list(
 rm(
   mTc, mTcTidy, mTcTidyInLine, mTcTidyWideInLine,
   tcTrialSlopeInLine, tcTrialSlopeMsTab, mTcCoefsMsTab,
+  mTcTidyFmt,
   emmTcAll, emmTcPts, emmTcPtsInLine,
   contTcLn, contTcLnInLine, contTcLnMsTab, contTcRsp,
   term_labels
@@ -415,7 +416,7 @@ emmTcPtsInLineQ1$confint_testEnd
 contrastsInLineQ1
 ```
 
-During the test phase of the experiment, trial number (experience) had a significant positive effect on the expected probability (\Pcorr) of a correct decision (Figure 1 solid line) with every successive trial increasing the log odds of a correct decision by `r mCoefsInLineQ1$trial_est` (95% CI `r mCoefsInLineQ1$trial_confint`, p `r mCoefsInLineQ1$trial_pFmt`).
+During the test phase of the experiment, trial number (experience) had a significant positive effect on the expected probability (\Pcorr) of a correct decision (Figure 1 solid line) with every successive trial increasing the log odds of a correct decision by `r mCoefsInLineQ1$rank_trial_logOdds` (95% CI `r mCoefsInLineQ1$rank_trial_confint`, p `r mCoefsInLineQ1$rank_trial_pFmt`).
 
 The \Pcorr of a correct choice at the end of the test was higher (\Pcorr = `r emmTcPtsInLineQ1$prob_testEnd`, 95% CI `r emmTcPtsInLineQ1$confint_testEnd`) than at the start of the control (\Pcorr = `r emmTcPtsInLineQ1$prob_ctrlStart`, 95% CI: `r emmTcPtsInLineQ1$confint_ctrlStart`), and this difference was significant (log odds ratio = `r contrastsInLineQ1$logOddsRatio`, p `r contrastsInLineQ1$pFmt`) (Figure 1, compare error bars between test and control panel).
 
@@ -500,8 +501,6 @@ issues: - day is mulitcollinear in thin oblique experiment. It makes the slope o
 - Are there differences in performance between naturalistic and artificial stimuli?
 
 ```{r q3NaturalisticTest}
-#| fig-width: 4
-#| fig-height: 8
 
 emmNatTestAll <- testRes$emmAll %>% filter(nat_or_art == "naturalistic")
 emmNatTestPtsLong <- testRes$emmPts %>% filter(nat_or_art == "naturalistic")
@@ -523,7 +522,7 @@ ggplot(emmNatTestAll,
   ) +
   ylim(0, 1) +
   geom_hline(yintercept = 0.5, linetype = "dashed") +
-  facet_wrap(vars(experiment), ncol =2)+
+  facet_wrap(vars(experiment), ncol =4)+
   ylab("P(correct)")+
   theme_bw()+ 
   theme(legend.position = "none")
@@ -532,13 +531,8 @@ ggplot(emmNatTestAll,
 ```
 
 ```{r q3TablePts}
-# table with pcorr at start and end of experiment (plus last trial number)
+# table with pcorr at start and end of experiment and last trial #
 q3NatTestPtsTable <- testRes$emmPtsMsTab %>%
-  # could save on a lot of lines / repetition if nat_or_art always comes along
-  left_join(
-    unique(choices[, c("experiment", "nat_or_art")]),
-    by = "experiment"
-  ) %>%
   filter(nat_or_art == "naturalistic") %>%
   select(-c(middleTrial, midPcorr95CI))
 
@@ -550,7 +544,7 @@ knitr::kable(
 
 ```
 
-Evidence for whether wasps can discriminate naturalistic canopies at above-chance rates (>50%) is mixed. In four of the seven naturalistic canopy pairs we tested, the predicted \Pcorr by the end of the experiment was significantly above chance (the lower limit of the 95% CI is > 50%, see Table x), suggesting wasps may be able to separate certain pairs of naturalistic canopies to some degree (assuming no other information was available to the wasps). 
+Evidence for whether wasps can discriminate naturalistic canopies at above-chance rates (>50%) is mixed. In four of the seven naturalistic canopy pairs we tested, the predicted \Pcorr by the end of the experiment was significantly above chance (the lower limit of the 95% CI is > 50%, see Table x), suggesting wasps may be able to separate certain pairs of naturalistic canopies to some degree. 
 
 ```{r q3NaturalisticTestControl}
 
@@ -571,10 +565,11 @@ choicesRollTc <- choices_rolling %>%
   filter(nat_or_art == "naturalistic" & experiment %in% expTestAndCtrl) 
 
 # add the best fit line and CIs to plots
-p <- ggplot(emmNatTcAll, aes(x = rank_trial, y = prob, colour = experiment)) +
+p <- ggplot(emmNatTcAll,
+            aes(x = rank_trial, y = prob)) +
   geom_line() + 
   geom_ribbon(
-    aes(ymin = asymp.LCL, ymax = asymp.UCL, fill = experiment),
+    aes(ymin = asymp.LCL, ymax = asymp.UCL),
     alpha = 0.15,
     colour = NA
   ) +
@@ -582,11 +577,11 @@ p <- ggplot(emmNatTcAll, aes(x = rank_trial, y = prob, colour = experiment)) +
   geom_hline(yintercept = 0.5, linetype = "dashed") +
   facet_grid(experiment ~ manipulation)+
   ylab("P(correct)")+
-  theme_grey()+ 
+  theme_bw()+ 
   theme(legend.position = "none")
 
 p + 
-  geom_point(data = choicesRollTc, aes(x = rank_trial, y = pcorr))+
+  geom_point(data = choicesRollTc, aes(x = rank_trial, y = pcorr), colour = "grey")+
   geom_hline(yintercept = 0.5, linetype = "dashed")+
   facet_grid(experiment ~ manipulation, space = "free", scales = "free_x")
 
@@ -606,12 +601,8 @@ p <- ggplot(emmNatTcPts, aes(x = manipulation, y = prob,
 
 ```
 
-```{r q3TableTcPts}
+```{r q3Table}
 q3NatTcPtsTable <- tcRes$emmPtsMsTab %>%
-  left_join(
-    unique(choices[, c("experiment", "nat_or_art")]),
-    by = "experiment"
-  ) %>%
   filter(nat_or_art == "naturalistic") %>%
   select(
     experiment,
@@ -626,27 +617,100 @@ knitr::kable(
   booktabs = TRUE
 )
 
+q3NatTcContrastTable <- tcRes$contrastsMsTab %>%
+  left_join(
+    distinct(tcRes$emmPtsMsTab, experiment, nat_or_art),
+    by = "experiment"
+  ) %>%
+  filter(nat_or_art == "naturalistic") %>%
+  select(
+    experiment,
+    logOddsRatio,
+    confint,
+    pFmt,
+    controlStartTrial,
+    testEndTrial
+  ) %>%
+  rename(
+    `Experiment` = experiment,
+    `Log-odds contrast` = logOddsRatio,
+    `95% CI` = confint,
+    `P` = pFmt,
+    `Control start trial` = controlStartTrial,
+    `Test end trial` = testEndTrial
+  )
+
+knitr::kable(
+  q3NatTcContrastTable,
+  caption = "Naturalistic test-control contrasts (test end vs control start)",
+  booktabs = TRUE
+)
+
 ```
 
 naturalistic test vs control
+Of the four naturalistic canopies that show \Pcorr > 50%, after three of those we also ran a control (patterns removed) directly after the test phase concluded, but in only one case (natcan1_170923) was the \Pcorr at the end of the test significantly higher than at the start of the control. This can be attributed to the fact that \Pcorr for the naturalistic canopies is generally not much greater than 50% (if at all), and the fact that control experiments were not run for many trials, increasing the uncertainty around the \Pcorr during the control phase. 
+
+```{r q3NatVsArtEndPlot}
+#| fig-cap: "End-of-test predicted performance by canopy type. Each point is one experiment; vertical bars are 95% CIs."
+
+q3NatArtEndPts <- testRes$emmPts %>%
+  group_by(experiment, nat_or_art) %>%
+  filter(rank_trial == max(rank_trial)) %>%
+  ungroup() %>%
+  mutate(
+    nat_or_art = factor(nat_or_art, levels = c("naturalistic", "artificial"))
+  )
+
+endCounts <- q3NatArtEndPts %>%
+  count(nat_or_art) %>%
+  mutate(
+    label = paste0(stringr::str_to_title(as.character(nat_or_art)), " (n=", n, ")")
+  )
+
+xLabs <- setNames(endCounts$label, as.character(endCounts$nat_or_art))
+ptJitter <- position_jitter(width = 0.08, height = 0, seed = 3)
+canopyCols <- c(naturalistic = "forestgreen", artificial = "black")
+
+ggplot(q3NatArtEndPts, aes(x = nat_or_art, y = prob)) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  geom_boxplot(
+    aes(color = nat_or_art),
+    width = 0.18,
+    outlier.shape = NA
+  ) +
+  geom_errorbar(
+    aes(ymin = asymp.LCL, ymax = asymp.UCL, color = nat_or_art),
+    width = 0.03,
+    alpha = 0.3,
+    position = ptJitter
+  ) +
+  geom_point(
+    aes(color = nat_or_art),
+    size = 2.2,
+    alpha = 0.1,
+    position = ptJitter
+  ) +
+  scale_x_discrete(labels = xLabs) +
+  scale_color_manual(values = canopyCols, guide = "none") +
+  scale_y_continuous(limits = c(0, 1)) +
+  labs(
+    x = "Canopy type",
+    y = "Predicted P(correct) at end of test"
+  ) +
+  theme_bw()
+
+# Todo 
+# I think it would be nice to complement this 'raincloud' plot with the lineplots of artificial and naturalistic side-by-side (these lineplots that appear in prev figs)
+
+```
 
 nat vs art:
-Discrimination performance for naturalistic canopies tends to be lower than for artificial canopies (make some sort of comparison or just give ranges) and 
-
-
-
-
-
-
-Produce necessary tables to report from in-line and to include in MS. 
-
-Write results here:
-Evidence that wasps can discriminate naturalistic canopies from the test vs control analysis is also mixed. 
-
-Coming soon: 1. comparison of naturalistic stimuli versus artificial
+Discrimination performance for naturalistic canopies tends to be lower than for artificial canopies. The highest performance for a naturalistic is x, for an artificial is y. The lowest performance for a naturalistic canopy is x and for artificial is y. The average performance for all naturalistic canopies is x, whereas for artificial it is y, and the difference in the average \Pcorr for naturalistic and artificial is z. 
 
 ToDo:
-- make master tables
+- merge testPTs table and Tc table for q3
+- merge models, just use Tc model
 - add end-trial estimates and CIs to all figures (q2 and q3 outstanding)
 - x and y figure axis labels
 - table headers and rownames need to be formatted for pub. 
@@ -665,7 +729,7 @@ ToDo:
 
 # arrange all experiments in tables by nat vs art column
 # change CI separation to use , or ;
-# merge logOdds and ci95 columns
+# merge logOdds and confint columns
 # merge contrast and pts predictions tables for tc data?
 # where is the control coefficient for tc model results?
 # abbreviate testEndTrial to TrEnd
@@ -707,18 +771,19 @@ s1TestPtsMsTab <- testRes$emmPtsMsTab %>%
 suppMsTabs <- list(
   "Test predictions at start, middle, and end trials" =
     s1TestPtsMsTab,
-  "Test model coefficients" =
-    testRes$mCoefsMsTab,
-  "Test trial-slope summary" =
-    testRes$trialSlopeMsTab,
-  "Test-control contrast summary" =
-    tcRes$contrastsMsTab,
   "Test-control predictions at test end and control start" =
     tcRes$emmPtsMsTab,
-  "Test-control model coefficients" =
-    tcRes$mCoefsMsTab,
+  "Test-control contrast summary" =
+    tcRes$contrastsMsTab,
+  "Test trial-slope summary" =
+    testRes$trialSlopeMsTab,
   "Test-control trial-slope summary" =
-    tcRes$trialSlopeMsTab
+    tcRes$trialSlopeMsTab,
+  "Test model coefficients" =
+    testRes$mCoefsMsTab,
+  "Test-control model coefficients" =
+    tcRes$mCoefsMsTab
+
 )
 
 purrr::iwalk(suppMsTabs, function(tbl, cap) {

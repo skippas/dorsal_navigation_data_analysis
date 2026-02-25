@@ -1,13 +1,17 @@
 contTcLnInLine <- contTcLn %>%
   mutate(pFmt = pvalue(p.value)) %>%
   fmtNumCols() %>%
-  mutate(confint = paste(asymp.LCL, asymp.UCL, sep = "-"))
+  make_confint_col(
+    lower_col = "asymp.LCL",
+    upper_col = "asymp.UCL",
+    out_col = "confint"
+  )
 
 contTcLnMsTab <- contTcLnInLine %>%
   transmute(
     experiment,
     logOddsRatio,
-    ci95 = confint,
+    confint,
     pFmt,
     controlStartTrial = control_start,
     testEndTrial = test_end

@@ -662,13 +662,34 @@ q3NatArtEndPts <- testRes$emmPts %>%
     nat_or_art = factor(nat_or_art, levels = c("naturalistic", "artificial"))
   )
 
-endCounts <- q3NatArtEndPts %>%
-  count(nat_or_art) %>%
+natArtMean <- q3NatArtEndPts %>%
+  group_by(nat_or_art) %>%
+  summarise(
+    mean_prob = mean(prob),
+    min_prob = min(prob),
+    max_prob = max(prob),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = nat_or_art,
+    values_from = c(mean_prob, min_prob, max_prob),
+    names_glue = "{nat_or_art}_{.value}"
+  ) %>%
   mutate(
-    label = paste0(stringr::str_to_title(as.character(nat_or_art)), " (n=", n, ")")
-  )
+    diff_mean_prob = artificial_mean_prob - naturalistic_mean_prob
+  ) %>%
+  fmtNumCols()
 
-xLabs <- setNames(endCounts$label, as.character(endCounts$nat_or_art))
+q3NatBest <- q3NatArtEndPts %>%
+  filter(nat_or_art == "naturalistic") %>%
+  slice_max(order_by = prob, n = 1, with_ties = FALSE) %>%
+  fmtNumCols()
+
+q3ArtWorst <- q3NatArtEndPts %>%
+  filter(nat_or_art == "artificial") %>%
+  slice_min(order_by = prob, n = 1, with_ties = FALSE) %>%
+  fmtNumCols()
+
 ptJitter <- position_jitter(width = 0.08, height = 0, seed = 3)
 canopyCols <- c(naturalistic = "forestgreen", artificial = "black")
 
@@ -676,7 +697,7 @@ ggplot(q3NatArtEndPts, aes(x = nat_or_art, y = prob)) +
   geom_hline(yintercept = 0.5, linetype = "dashed") +
   geom_boxplot(
     aes(color = nat_or_art),
-    width = 0.18,
+    width = 0.2,
     outlier.shape = NA
   ) +
   geom_errorbar(
@@ -687,11 +708,10 @@ ggplot(q3NatArtEndPts, aes(x = nat_or_art, y = prob)) +
   ) +
   geom_point(
     aes(color = nat_or_art),
-    size = 2.2,
+    size = 2,
     alpha = 0.1,
     position = ptJitter
   ) +
-  scale_x_discrete(labels = xLabs) +
   scale_color_manual(values = canopyCols, guide = "none") +
   scale_y_continuous(limits = c(0, 1)) +
   labs(
@@ -700,13 +720,15 @@ ggplot(q3NatArtEndPts, aes(x = nat_or_art, y = prob)) +
   ) +
   theme_bw()
 
+# calculate summary stats of nat vs art
+
 # Todo 
 # I think it would be nice to complement this 'raincloud' plot with the lineplots of artificial and naturalistic side-by-side (these lineplots that appear in prev figs)
 
 ```
 
 nat vs art:
-Discrimination performance for naturalistic canopies tends to be lower than for artificial canopies. The highest performance for a naturalistic is x, for an artificial is y. The lowest performance for a naturalistic canopy is x and for artificial is y. The average performance for all naturalistic canopies is x, whereas for artificial it is y, and the difference in the average \Pcorr for naturalistic and artificial is z. 
+Discrimination performance for naturalistic canopies tends to be lower than for artificial canopies. The naturalistic canopy showing the best performance (`r q3NatBest$experiment`, \Pcorr = `r q3NatBest$prob`) still has a lower \Pcorr than the artificial canopy with the worst performance (`r q3ArtWorst$experiment`, \Pcorr = `r q3ArtWorst$prob`). The average performance for all naturalistic canopies is `r natArtMean$naturalistic_mean_prob`, whereas for artificial it is `r natArtMean$artificial_mean_prob`, and the difference in the average \Pcorr for naturalistic and artificial is `r natArtMean$diff_mean_prob`. Given the low number of artificial and naturalistic experiments included here (n = 3 and 7 respectively) we did not test for an overall difference between naturalistic and artificial canopies. 
 
 ToDo:
 - merge testPTs table and Tc table for q3

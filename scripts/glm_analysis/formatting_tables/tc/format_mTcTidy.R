@@ -1,8 +1,4 @@
 mTcTidyFmt <- mTcTidy %>%
-  left_join(
-    unique(choices[, c("experiment", "nat_or_art")]),
-    by = "experiment"
-  ) %>%
   rename(logOdds = estimate) %>%
   mutate(
     pFmt = pvalue(p.value, accuracy = 0.001),

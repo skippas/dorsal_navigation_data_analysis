@@ -14,7 +14,8 @@ knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 knitr::opts_chunk$set(
   echo    = FALSE,  # hide code
   message = FALSE,  # hide package messages
-  warning = FALSE   # hide warnings
+  warning = FALSE,  # hide warnings
+  fig.align = "center"
 )
 
 if (knitr::pandoc_to("docx")) {
@@ -151,7 +152,11 @@ mTc <- choices %>%
            data = .x, family = binomial))
 # it might be best to run this as one combined model to handle 'day' better. im excluding it for now as i have no idea what impact it would have
 # get resuls into tidy format
-mTcTidy <- map_df(mTest, broom.mixed::tidy, conf.int = T, .id = "experiment")
+mTcTidy <- map_df(mTc, broom.mixed::tidy, conf.int = T, .id = "experiment") %>%
+  left_join(
+    unique(choices[, c("experiment", "nat_or_art")]),
+    by = "experiment"
+  )
 
 # generate predictions for all trials and contrasts for specific trials
 emmPredCont <- map2(
@@ -232,6 +237,12 @@ emmTcAll <- left_join(
   emmTcAll,
   unique(choices[, c("experiment", "nat_or_art")]),
   by = "experiment")
+
+contTcLn <- left_join(
+  contTcLn,
+  unique(choices[, c("experiment", "nat_or_art")]),
+  by = "experiment"
+)
 
 # predictions for specific trials (end of the test and the start of the control) 
 # by subsetting all trials predictions
@@ -426,13 +437,19 @@ rm(
 q2ExpOrder <- c("thinOb_150823", "brightDiff_250725")
 
 emmArtTcAll <- tcRes$emmAll %>%
-  filter(experiment %in% q2ExpOrder) %>%
+  filter(experiment == "thinOb_150823")
+
+emmBrightTestAll <- testRes$emmAll %>%
+  filter(experiment == "brightDiff_250725") %>%
+  mutate(manipulation = "test")
+
+emmArtPlotAll <- bind_rows(emmArtTcAll, emmBrightTestAll) %>%
   mutate(
     experiment = factor(experiment, levels = q2ExpOrder),
     manipulation = factor(manipulation, levels = c("test", "control"))
   )
 
-p <- ggplot(emmArtTcAll, aes(x = rank_trial, y = prob)) +
+p <- ggplot(emmArtPlotAll, aes(x = rank_trial, y = prob)) +
   geom_ribbon(aes(ymin = asymp.LCL, ymax = asymp.UCL), alpha = 0.2) +
   geom_line() +
   labs(x = "Trial", y = "% of decisions for reward") +
@@ -471,17 +488,45 @@ q2TrialSlopeTable <- testRes$trialSlopeInLine %>%
   filter(nat_or_art == "artificial") %>%
   select(-nat_or_art)
 
-formatSlopeTable(
-  q2TrialSlopeTable,
-  caption = "Q2 trial-slope summary by artificial experiment"
+# hidden for now: unhide by uncommenting the block below
+# formatSlopeTable(
+#   q2TrialSlopeTable,
+#   caption = "Q2 trial-slope summary by artificial experiment"
+# )
+
+q2ArtTcContrastTable <- tcRes$contrastsMsTab %>%
+  filter(nat_or_art == "artificial", experiment %in% q2ExpOrder) %>%
+  select(
+    experiment,
+    logOddsRatio,
+    confint,
+    pFmt,
+    controlStartTrial,
+    testEndTrial
+  ) %>%
+  rename(
+    `Experiment` = experiment,
+    `Log-odds contrast` = logOddsRatio,
+    `95% CI` = confint,
+    `P` = pFmt,
+    `Control start trial` = controlStartTrial,
+    `Test end trial` = testEndTrial
+  )
+
+knitr::kable(
+  q2ArtTcContrastTable,
+  caption = "Artificial test-control contrasts (test end vs control start)",
+  booktabs = TRUE
 )
 
+# to do: mstab should be used here above, why isnt it?
+# I don't think this trial slope table is necessary. Just have a model coefficient table per experiment in the supp.
 
 ```
 
-To answer whether wasps require optic flow information to discriminate patterns we tested whether they could distinguish a new artificial pattern-pair, one consisting of oblique stripes oriented at either 45 degrees to the right or to the left of the y-maze arm's long axis and the general direction of wasp travel. Here again, we tested whether the proportion of correct choices for this pattern-pair was >50% as evidence that wasps do not rely exclusively on optic flow to discriminate among stimuli. We did not run contr... (to do, incl. control data and use facet grid figure with only the bright diff and oblique data). also to do: add the test-control contrast table.
+To answer whether wasps require optic flow information to discriminate patterns we tested whether they could distinguish a new artificial pattern-pair, one consisting of oblique stripes oriented at either 45 degrees to the right or to the left of the y-maze arm's long axis and the general direction of wasp travel. Here again, evidence that wasps can distinguish stimuli that generate identical rates of optic flow is evidenced by a $P_{\mathrm{corr}}$ >50% and a larger $P_{\mathrm{corr}}$ at the end of the test relative to the start of the control. 
 
-Wasps had no trouble distinguishing between oblique stripes that presumably produce identical rates of optic flow in the dorsal visual field (Figure 2). Similar to the perpendicular-parallel experiment, trial had a significant positive effect on $P_{\mathrm{corr}}$, with every successive trial increasing the log odds of a correct decision by `r q2TrialSlopeTable["thinOb_150823", "logOdds"]` (95% CI `r q2TrialSlopeTable["thinOb_150823", "confint"]`, p `r q2TrialSlopeTable["thinOb_150823", "pFmt"]`; Table 1). Initially (at trial 1) performance was not significantly different from chance ($P_{\mathrm{corr}}$ = `r emmArt["thinOb_150823", "first_prob"]`, 95% CI `r emmArt["thinOb_150823", "first_confint"]`) but rose steeply, reaching `r emmArt["thinOb_150823", "last_prob"]` (95% CI `r emmArt["thinOb_150823", "last_confint"]`) by the end of the experiment (trial 66), which is significantly higher than expected by chance (50%).
+Wasps had no trouble distinguishing between oblique stripes that presumably produce identical rates of optic flow in the dorsal visual field (Figure 2). Similar to the perpendicular-parallel experiment, trial had a significant positive effect on $P_{\mathrm{corr}}$, with every successive trial increasing the log odds of a correct decision by `r q2TrialSlopeTable["thinOb_150823", "logOdds"]` (95% CI `r q2TrialSlopeTable["thinOb_150823", "confint"]`, p `r q2TrialSlopeTable["thinOb_150823", "pFmt"]`; Table 1). Initially (at trial 1) performance was not significantly different from chance ($P_{\mathrm{corr}}$ = `r emmArt["thinOb_150823", "first_prob"]`, 95% CI `r emmArt["thinOb_150823", "first_confint"]`) but rose steeply, reaching `r emmArt["thinOb_150823", "last_prob"]` (95% CI `r emmArt["thinOb_150823", "last_confint"]`) by the end of the experiment (trial 66), which is significantly higher than expected by chance (50%). $P_{\mathrm{corr}}$ at the end of the test phase of experiment was also higher than in the control (insert stats here). 
 
 Next, we asked whether wasps could discriminate between an opaque and transparent roof, ie. between stimuli that carried little to no pattern information. While trial had a positive effect on $P_{\mathrm{corr}}$ (beta = `r q2TrialSlopeTable["brightDiff_250725", "logOdds"]`, 95% CI `r q2TrialSlopeTable["brightDiff_250725", "confint"]`), unlike for the other two pairs of artificial stimuli this effect was not significant (p = `r q2TrialSlopeTable["brightDiff_250725", "pFmt"]`), likely due to the much shorter number of trials this experiment was run for. While statistical support for a positive slope is lacking, there is support for $P_{\mathrm{corr}}$ > 50% towards the middle and end of the experiment. At the onset of the experiment (trial 1), wasp performance was not significantly different from 50% ($P_{\mathrm{corr}}$ = `r emmArt["brightDiff_250725", "first_prob"]`, 95% CI `r emmArt["brightDiff_250725", "first_confint"]`) but rises with experience and by the end of the experiment (trial 26) $P_{\mathrm{corr}}$ reached `r emmArt["brightDiff_250725", "last_prob"]` (95% CI `r emmArt["brightDiff_250725", "last_confint"]`). Performance at the end of the experiment is only borderline significantly higher than 50% because of the increased uncertainty in the slope / effect of trials on performance due to the lower number of trials run in this experiment. However, if one uses other metrics or analyses to compare performance to the 50% line, they are significantly different (for example, comparing performance at an intermediate trial or comparing the average performance of the last five trials to the 50% line).
 
@@ -619,10 +664,6 @@ knitr::kable(
 )
 
 q3NatTcContrastTable <- tcRes$contrastsMsTab %>%
-  left_join(
-    distinct(tcRes$emmPtsMsTab, experiment, nat_or_art),
-    by = "experiment"
-  ) %>%
   filter(nat_or_art == "naturalistic") %>%
   select(
     experiment,
@@ -741,6 +782,7 @@ Formatting
 - perhasp change rolling mean points to become transparent
 - is the way i introduce a results section correct?
 - what is the logic behind when / where to reference tables and figures in line?
+- we need figure captions
 
 - Run an overall test comparing naturalistic and artificial canopies (including all data)
 - merge testPTs table and Tc table for q3

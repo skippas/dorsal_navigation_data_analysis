@@ -11,7 +11,7 @@ contTcLnInLine <- contTcLn %>%
 
 contTcLnMsTab <- contTcLnInLine %>%
   transmute(
-    experiment,
+    experiment, nat_or_art,
     logOddsRatio,
     confint,
     pFmt,

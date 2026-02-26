@@ -9,7 +9,7 @@ mTcTidyFmt <- mTcTidy %>%
     oddsMultiplier = exp(logOdds)
   ) %>%
   fmtNumCols() %>%
-  make_confint_col() %>%
+  make_confint_col(prefix = "[", suffix = "]") %>%
   arrange(nat_or_art, experiment)
 
 mTcTidyInLine <- mTcTidyFmt

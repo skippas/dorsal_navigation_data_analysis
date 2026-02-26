@@ -5,7 +5,7 @@ mTestTidyFmt <- mTestTidy %>%
     oddsMultiplier = exp(logOdds)
   ) %>%
   fmtNumCols() %>%
-  make_confint_col() %>%
+  make_confint_col(prefix = "[", suffix = "]") %>%
 #  mutate(term = recode(term, !!!term_labels)) %>% not sure i want to recode the terms
   arrange(nat_or_art, experiment)
 

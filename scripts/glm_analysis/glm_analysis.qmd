@@ -1,11 +1,7 @@
 ---
 title: "glm_analysis"
 format:
-  pdf:
-    include-in-header:
-      text: |
-          \usepackage{xspace}
-          \newcommand{\Pcorr}{\ensuremath{P_{\mathrm{corr}}}\xspace}
+  pdf: default
 execute:
   dir: project
   
@@ -37,7 +33,6 @@ library(scales)
 source("scripts//loading_cleaning.R")
 styleEnv <- new.env(parent = environment())
 source("scripts//custom_themes_and_colour_palettes.R", local = styleEnv)
-
 # keep only style objects used in this document
 plotStyle <- list(
   themeTextEnlarged = styleEnv$custom_theme_text_enlarged
@@ -57,9 +52,10 @@ choices$manipulation <- relevel(choices$manipulation, ref = "test")
 ```
 
 
-Make the computations necessary for all questions:
 ```{r buildTestModels}
 #| cache: true
+
+# Make the computations necessary for all questions:
 
 # three data structures derived here:
 # 1. models and model results 
@@ -334,24 +330,6 @@ rm(sourceFmt, formattingTablesDir)
 
 ```
 
-```{r draftPubTables}
-
-# create pub-ready tables?
- # # %>% separate this bit into a 'pub ready' table?
- #  select(c(experiment, rank_trial_middle, probConfint_middle,
- #           rank_trial_end, probConfint_end)) %>%
- #  arrange(experiment) %>%
- #  # rename it so it's publication-ready? or ready to go into paper?
- #  # (this will make indexing challenging)
- #  rename(
- #    `Pmiddle (95% CI)` = probConfint_middle,
- #    `Pend (95% CI)`    = probConfint_end,
- #    `Middle trial #`     = rank_trial_middle,
- #    `End trial #`        = rank_trial_end
- #  )
-
-```
-
 ```{r buildRollingChoices}
 # create a rolling-mean dataframe so underlying raw-data can be visualised
 choices_rolling <- choices %>%
@@ -368,11 +346,8 @@ choices_rolling <- choices %>%
 
 ```
 
-# Question 1: Can wasps use dorsal patterns?
-    -   Looking at test versus control proportion correct
-    -   Slope in test and control
-    -   EMmeans at end of test and control
-        -   is this essentially equivalent to binning the last n trials and making the comparison?
+# Question 1: Can wasps discriminate a 'simple' artificial dorsal pattern?
+Evidence that wasps can use overhead patterns comes from two observations. First, That the proportion of choices for the rewarding pattern is >50% and second, that this proportion of decisions for the rewarding patterns drops when the patterns are removed from the roof (during the control).
 
 ```{r q1PlotAndFilterTables}
 
@@ -412,15 +387,14 @@ p <- p +
 
 p + geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr),
                colour = "grey")
-emmTcPtsInLineQ1$confint_testEnd
-contrastsInLineQ1
+
 ```
 
-During the test phase of the experiment, trial number (experience) had a significant positive effect on the expected probability (\Pcorr) of a correct decision (Figure 1 solid line) with every successive trial increasing the log odds of a correct decision by `r mCoefsInLineQ1$rank_trial_logOdds` (95% CI `r mCoefsInLineQ1$rank_trial_confint`, p `r mCoefsInLineQ1$rank_trial_pFmt`).
+During the test phase of the experiment, trial number (experience) had a significant positive effect on the expected probability ($P_{\mathrm{corr}}$) of a correct decision (Figure 1 solid line) with every successive trial increasing the log odds of a correct decision by `r mCoefsInLineQ1$rank_trial_logOdds` (95% CI `r mCoefsInLineQ1$rank_trial_confint`, p `r mCoefsInLineQ1$rank_trial_pFmt`).
 
-The \Pcorr of a correct choice at the end of the test was higher (\Pcorr = `r emmTcPtsInLineQ1$prob_testEnd`, 95% CI `r emmTcPtsInLineQ1$confint_testEnd`) than at the start of the control (\Pcorr = `r emmTcPtsInLineQ1$prob_ctrlStart`, 95% CI: `r emmTcPtsInLineQ1$confint_ctrlStart`), and this difference was significant (log odds ratio = `r contrastsInLineQ1$logOddsRatio`, p `r contrastsInLineQ1$pFmt`) (Figure 1, compare error bars between test and control panel).
+The $P_{\mathrm{corr}}$ of a correct choice at the end of the test was $P_{\mathrm{corr}}$ = `r emmTcPtsInLineQ1$prob_testEnd` (95% CI `r emmTcPtsInLineQ1$confint_testEnd`). The lower bound of the 95% confidence interval ([insert lower bound here]) was >50%, implying that $P_{\mathrm{corr}}$ was significantly higher chance (50%) (black error bar in Figure 1 test panel does not overlap horizontal dashed line). $P_{\mathrm{corr}}$ at the end of the experiment was also significantly higher than at the start of the control ($P_{\mathrm{corr}}$ = `r emmTcPtsInLineQ1$prob_ctrlStart`, 95% CI `r emmTcPtsInLineQ1$confint_ctrlStart`), and this difference was significant (log odds ratio = `r contrastsInLineQ1$logOddsRatio`, p `r contrastsInLineQ1$pFmt`) (Figure 1, note lack of overlap of error bars between test and control panel).
 
-Also note that \Pcorr is significantly above chance (95% confidence ribbon does not overlap the 50% line) from an early trial number and remains that way until the end of the test. In contrast, the \Pcorr in the control phase is never significantly above chance for the duration of the control (95% confidence ribbon overlaps the 50% line).
+Also note that $P_{\mathrm{corr}}$ is significantly above chance (grey shaded 95% confidence ribbon in Figure 1 does not overlap the 50% line) from an early trial number and remains that way until the end of the test. In contrast, the $P_{\mathrm{corr}}$ in the control phase is never significantly above chance for the duration of the control (95% confidence ribbon overlaps the 50% line), as one would expect for wasps making choices in the absence of any information regarding the location of the reward.
 
 That the model suggests naive wasps perform above chance at the onset of the test phase (ie. in trial 1) can be attributed to the fact that the model is unable to fit the rapid learning of the wasps, rather than to the availability and learning of olfactory and / or temporal cues during the pre-test training phase. This is supported by the proportion of correct decisions in the first few 3-trial wide windows of the test phase (black points) that are clustered around 50%.
 
@@ -485,9 +459,9 @@ formatSlopeTable(
 
 To answer whether wasps require optic flow information to discriminate patterns we tested whether they could distinguish between oblique stripes oriented at 45 degrees to the right or left of the y-maze arm's long axis and the general direction of wasp travel. 
 
-Wasps had no trouble distinguishing between oblique stripes that presumably produce identical rates of optic flow in the dorsal visual field (Figure 2). Similar to the perpendicular-parallel experiment, trial had a significant positive effect on \Pcorr, with every successive trial increasing the log odds of a correct decision by `r q2TrialSlopeTable["thinOb_150823", "logOdds"]` (95% CI `r q2TrialSlopeTable["thinOb_150823", "confint"]`, p `r q2TrialSlopeTable["thinOb_150823", "pFmt"]`; Table 1). Initially (at trial 1) performance was not significantly different from chance (\Pcorr = `r emmArt["thinOb_150823", "first_prob"]`, 95% CI: `r emmArt["thinOb_150823", "first_confint"]`) but rose steeply, reaching `r emmArt["thinOb_150823", "last_prob"]` (95% CI: `r emmArt["thinOb_150823", "last_confint"]`) by the end of the experiment (trial 66), which is significantly higher than expected by chance (50%).
+Wasps had no trouble distinguishing between oblique stripes that presumably produce identical rates of optic flow in the dorsal visual field (Figure 2). Similar to the perpendicular-parallel experiment, trial had a significant positive effect on $P_{\mathrm{corr}}$, with every successive trial increasing the log odds of a correct decision by `r q2TrialSlopeTable["thinOb_150823", "logOdds"]` (95% CI `r q2TrialSlopeTable["thinOb_150823", "confint"]`, p `r q2TrialSlopeTable["thinOb_150823", "pFmt"]`; Table 1). Initially (at trial 1) performance was not significantly different from chance ($P_{\mathrm{corr}}$ = `r emmArt["thinOb_150823", "first_prob"]`, 95% CI `r emmArt["thinOb_150823", "first_confint"]`) but rose steeply, reaching `r emmArt["thinOb_150823", "last_prob"]` (95% CI `r emmArt["thinOb_150823", "last_confint"]`) by the end of the experiment (trial 66), which is significantly higher than expected by chance (50%).
 
-Next, we asked whether wasps could discriminate between an opaque and transparent roof, ie. between stimuli that carried little to no pattern information. While trial had a positive effect on \Pcorr (beta = `r q2TrialSlopeTable["brightDiff_250725", "logOdds"]`, 95% CI `r q2TrialSlopeTable["brightDiff_250725", "confint"]`), unlike for the other two pairs of artificial stimuli this effect was not significant (p = `r q2TrialSlopeTable["brightDiff_250725", "pFmt"]`), likely due to the much shorter number of trials this experiment was run for. While statistical support for a positive slope is lacking, there is support for \Pcorr > 50% towards the middle and end of the experiment. At the onset of the experiment (trial 1), wasp performance was not significantly different from 50% (\Pcorr = `r emmArt["brightDiff_250725", "first_prob"]`, 95% CI: `r emmArt["brightDiff_250725", "first_confint"]`))  but rises with experience and by the end of the experiment (trial 26) \Pcorr reached `r emmArt["brightDiff_250725", "last_prob"]` (95% CI: `r emmArt["brightDiff_250725", "last_confint"]`). Performance at the end of the experiment is only borderline significantly higher than 50% because of the increased uncertainty in the slope / effect of trials on performance due to the lower number of trials run in this experiment. However, if one uses other metrics or analyses to compare performance to the 50% line, they are significantly different (for example, comparing performance at an intermediate trial or comparing the average performance of the last five trials to the 50% line).
+Next, we asked whether wasps could discriminate between an opaque and transparent roof, ie. between stimuli that carried little to no pattern information. While trial had a positive effect on $P_{\mathrm{corr}}$ (beta = `r q2TrialSlopeTable["brightDiff_250725", "logOdds"]`, 95% CI `r q2TrialSlopeTable["brightDiff_250725", "confint"]`), unlike for the other two pairs of artificial stimuli this effect was not significant (p = `r q2TrialSlopeTable["brightDiff_250725", "pFmt"]`), likely due to the much shorter number of trials this experiment was run for. While statistical support for a positive slope is lacking, there is support for $P_{\mathrm{corr}}$ > 50% towards the middle and end of the experiment. At the onset of the experiment (trial 1), wasp performance was not significantly different from 50% ($P_{\mathrm{corr}}$ = `r emmArt["brightDiff_250725", "first_prob"]`, 95% CI `r emmArt["brightDiff_250725", "first_confint"]`) but rises with experience and by the end of the experiment (trial 26) $P_{\mathrm{corr}}$ reached `r emmArt["brightDiff_250725", "last_prob"]` (95% CI `r emmArt["brightDiff_250725", "last_confint"]`). Performance at the end of the experiment is only borderline significantly higher than 50% because of the increased uncertainty in the slope / effect of trials on performance due to the lower number of trials run in this experiment. However, if one uses other metrics or analyses to compare performance to the 50% line, they are significantly different (for example, comparing performance at an intermediate trial or comparing the average performance of the last five trials to the 50% line).
 
 NBNB! Slope or brightdiff exp not significant. fade best fit line?
 
@@ -544,7 +518,7 @@ knitr::kable(
 
 ```
 
-Evidence for whether wasps can discriminate naturalistic canopies at above-chance rates (>50%) is mixed. In four of the seven naturalistic canopy pairs we tested, the predicted \Pcorr by the end of the experiment was significantly above chance (the lower limit of the 95% CI is > 50%, see Table x), suggesting wasps may be able to separate certain pairs of naturalistic canopies to some degree. 
+Evidence for whether wasps can discriminate naturalistic canopies at above-chance rates (>50%) is mixed. In four of the seven naturalistic canopy pairs we tested, the predicted $P_{\mathrm{corr}}$ by the end of the experiment was significantly above chance (the lower limit of the 95% CI is > 50%, see Table x), suggesting wasps may be able to separate certain pairs of naturalistic canopies to some degree. 
 
 ```{r q3NaturalisticTestControl}
 
@@ -649,7 +623,7 @@ knitr::kable(
 ```
 
 naturalistic test vs control
-Of the four naturalistic canopies that show \Pcorr > 50%, after three of those we also ran a control (patterns removed) directly after the test phase concluded, but in only one case (natcan1_170923) was the \Pcorr at the end of the test significantly higher than at the start of the control. This can be attributed to the fact that \Pcorr for the naturalistic canopies is generally not much greater than 50% (if at all), and the fact that control experiments were not run for many trials, increasing the uncertainty around the \Pcorr during the control phase. 
+Of the four naturalistic canopies that show $P_{\mathrm{corr}}$ > 50%, after three of those we also ran a control (patterns removed) directly after the test phase concluded, but in only one case (natcan1_170923) was the $P_{\mathrm{corr}}$ at the end of the test significantly higher than at the start of the control. This can be attributed to the fact that $P_{\mathrm{corr}}$ for the naturalistic canopies is generally not much greater than 50% (if at all), and the fact that control experiments were not run for many trials, increasing the uncertainty around the $P_{\mathrm{corr}}$ during the control phase. 
 
 ```{r q3NatVsArtEndPlot}
 #| fig-cap: "End-of-test predicted performance by canopy type. Each point is one experiment; vertical bars are 95% CIs."
@@ -728,9 +702,20 @@ ggplot(q3NatArtEndPts, aes(x = nat_or_art, y = prob)) +
 ```
 
 nat vs art:
-Discrimination performance for naturalistic canopies tends to be lower than for artificial canopies. The naturalistic canopy showing the best performance (`r q3NatBest$experiment`, \Pcorr = `r q3NatBest$prob`) still has a lower \Pcorr than the artificial canopy with the worst performance (`r q3ArtWorst$experiment`, \Pcorr = `r q3ArtWorst$prob`). The average performance for all naturalistic canopies is `r natArtMean$naturalistic_mean_prob`, whereas for artificial it is `r natArtMean$artificial_mean_prob`, and the difference in the average \Pcorr for naturalistic and artificial is `r natArtMean$diff_mean_prob`. Given the low number of artificial and naturalistic experiments included here (n = 3 and 7 respectively) we did not test for an overall difference between naturalistic and artificial canopies. 
+Discrimination performance for naturalistic canopies tends to be lower than for artificial canopies. The naturalistic canopy showing the best performance (`r q3NatBest$experiment`, $P_{\mathrm{corr}}$ = `r q3NatBest$prob`) still has a lower $P_{\mathrm{corr}}$ than the artificial canopy with the worst performance (`r q3ArtWorst$experiment`, $P_{\mathrm{corr}}$ = `r q3ArtWorst$prob`). The average performance for all naturalistic canopies is `r natArtMean$naturalistic_mean_prob`, whereas for artificial it is `r natArtMean$artificial_mean_prob`, and the difference in the average $P_{\mathrm{corr}}$ for naturalistic and artificial is `r natArtMean$diff_mean_prob`. Given the low number of artificial and naturalistic experiments included here (n = 3 and 7 respectively) we did not test for an overall difference between naturalistic and artificial canopies. 
 
 ToDo:
+
+Formatting
+- remove weird dash formatting under q1
+- remove results at top of document
+- several places missing their statistics
+- change figures such that lines are in front of rolling mean points
+- perhasp change rolling mean points to become transparent
+- is the way i introduce a results section correct?
+- what is the logic behind when / where to reference tables and figures in line?
+
+- Run an overall test comparing naturalistic and artificial canopies (including all data)
 - merge testPTs table and Tc table for q3
 - merge models, just use Tc model
 - add end-trial estimates and CIs to all figures (q2 and q3 outstanding)

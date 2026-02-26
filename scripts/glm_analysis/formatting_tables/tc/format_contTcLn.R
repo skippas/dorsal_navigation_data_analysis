@@ -4,7 +4,9 @@ contTcLnInLine <- contTcLn %>%
   make_confint_col(
     lower_col = "asymp.LCL",
     upper_col = "asymp.UCL",
-    out_col = "confint"
+    out_col = "confint",
+    prefix = "[",
+    suffix = "]"
   )
 
 contTcLnMsTab <- contTcLnInLine %>%

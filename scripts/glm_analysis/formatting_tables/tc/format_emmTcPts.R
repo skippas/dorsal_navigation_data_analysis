@@ -12,7 +12,9 @@ emmTcPtsWide <- emmTcPts %>%
   make_confint_col(
     lower_col = "asymp.LCL",
     upper_col = "asymp.UCL",
-    out_col = "confint"
+    out_col = "confint",
+    prefix = "[",
+    suffix = "]"
   ) %>%
   select(experiment, nat_or_art, rank_trial, prob, confint, trial_pos) %>%
   pivot_wider(

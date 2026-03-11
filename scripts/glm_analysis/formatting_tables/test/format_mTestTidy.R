@@ -20,7 +20,11 @@ mTestTidyWideInLine <- mTestTidyInLine %>%
   )
 
 mTestCoefsMsTab <- mTestTidyFmt %>% 
-  select(experiment, nat_or_art, term, logOdds, confint, pFmt)
+  transmute(
+    experiment, nat_or_art, term,
+    logOdds95CI = sprintf("%s %s", logOdds, confint),
+    pFmt
+  )
 
 testTrialSlopeInLine <- mTestTidyFmt %>%
   filter(term == "rank_trial") %>%
@@ -28,4 +32,10 @@ testTrialSlopeInLine <- mTestTidyFmt %>%
   tibble::column_to_rownames("experiment")
 
 testTrialSlopeMsTab <- testTrialSlopeInLine %>%
-  tibble::rownames_to_column("experiment")
+  tibble::rownames_to_column("experiment") %>%
+  transmute(
+    experiment, nat_or_art,
+    trialLogOdds95CI = sprintf("%s %s", logOdds, confint),
+    pFmt,
+    oddsMultiplier
+  )

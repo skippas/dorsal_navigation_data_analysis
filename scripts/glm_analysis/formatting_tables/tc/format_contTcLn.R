@@ -12,9 +12,7 @@ contTcLnInLine <- contTcLn %>%
 contTcLnMsTab <- contTcLnInLine %>%
   transmute(
     experiment, nat_or_art,
-    logOddsRatio,
-    confint,
+    logOddsRatio95CI = sprintf("%s %s", logOddsRatio, confint),
     pFmt,
-    controlStartTrial = control_start,
     testEndTrial = test_end
   )

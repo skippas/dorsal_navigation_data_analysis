@@ -12,17 +12,17 @@ execute:
 header-includes:
   - \usepackage{caption}
   - \captionsetup{format=plain, labelsep=period, justification=justified, singlelinecheck=false}
-editor: 
-  markdown: 
+editor:
+  markdown:
     wrap: 72
 ---
 
 ```{r setupQuarto, echo=FALSE}
 knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
 knitr::opts_chunk$set(
-  echo    = FALSE,  # hide code
-  message = FALSE,  # hide package messages
-  warning = FALSE,  # hide warnings
+  echo    = FALSE,
+  message = FALSE,
+  warning = FALSE,
   fig.align = "center"
 )
 
@@ -34,342 +34,16 @@ if (knitr::pandoc_to("docx")) {
     fig.retina = 1
   )
 }
-
 ```
 
-```{r loadAndCleanChoices, include=FALSE}
-
-# load up the raw data
-
-rm(list = ls())
-library(here)
-library(lme4)
-library(broom.mixed)
+```{r loadResults, include=FALSE}
+# Load pre-computed and formatted results.
+# To regenerate: run run_analysis.R then format_results.R from the project root.
 library(tidyverse)
-library(emmeans)
-library(zoo)
 library(scales)
-source("scripts//loading_cleaning.R")
-styleEnv <- new.env(parent = environment())
-source("scripts//custom_themes_and_colour_palettes.R", local = styleEnv)
-# keep only style objects used in this document
-plotStyle <- list(
-  themeTextEnlarged = styleEnv$custom_theme_text_enlarged
-)
-rm(styleEnv)
-
-# removing data that isn't relevant to the main analysis
-choices %<>% filter(
-  ! experiment %in% c("thick_oblique_apis", "thickOb_140823", "thickObDiff_210924",
-                      "perpPara_240723", "perpParaPostNatcan_090925"))
-
-# converting decision to numeric for modelling:
-choices$decision <- as.numeric(choices$decision)
-# making test the reference level as control always followed (chronologically):
-choices$manipulation <- relevel(choices$manipulation, ref = "test")
-
-
-```
-
-```{r buildTestModels}
-#| cache: true
-
-# Make the computations necessary for all questions:
-
-# three data structures derived here:
-# 1. models and model results 
-# 2. emm predictions for all trials
-# 3. emm predictions for specific trials 
-
-# classes of models:
-# 1. models to look at the test phase of experiments
-# 2. models to compare the test and the control phase
-# do 1 and 2 really need to have separate model specs? probably just have one 
-
-# 1: models looking at test only
-mTest <- choices %>% 
-  filter(manipulation == "test") %>%
-  split(.$experiment, drop = T) %>%
-  # I removed day from the model below because brightDiff experiment causes trouble if its excluded. There is obviously a smarter way around that issue however
-  map(~ glmer(
-    decision ~ rank_trial + sideAlt_trial + reward_side +
-               (1 | individual),
-               data = .x, family = binomial))
-
-# get resuls into tidy format
-mTestTidy <- map_df(mTest, broom.mixed::tidy, conf.int = T, .id = "experiment") %>%
-  # bring in nat vs art variable
-  left_join(
-    unique(choices[, c("experiment", "nat_or_art")]),
-    by = "experiment"
-  ) 
-
-# find start, mid and end trials from emmeans
-emmTestAll <- map2(
-  .x = mTest, .y = names(mTest),
-  function(m, exp_id) {
-
-    emmeans(m, ~ rank_trial,
-            # gets predictions for every trial rather than covariate avg
-          cov.keep = "rank_trial", 
-          type = "response") %>%
-      as.data.frame() %>%
-      mutate(experiment = exp_id)
-    
-})
-emmTestAll <- list_rbind(emmTestAll)
-
-# to bring in the nat vs art variable
-emmTestAll <- left_join(
-  emmTestAll,
-  unique(choices[, c("experiment", "nat_or_art")]),
-  by = "experiment")
-
-# get start, end and middle of test predictions: 
-emmTestPts <- emmTestAll %>% 
-  group_by(experiment) %>%
-  # get the 'mid trial'
-  mutate(mid_trial = ceiling((min(rank_trial) + max(rank_trial)) / 2)) %>%
-  filter(rank_trial == max(rank_trial) | rank_trial == 1 |
-           rank_trial == mid_trial) %>%
-  select(-mid_trial)
-
-```
-
-```{r buildTcModels}
-#| cache: false
-
-# four data structures built here:
-# 1. models and model results (mTc)
-# 2. emm predictions for all trials (emmTcAll)
-# 3. emm predictions for specific trials (emmTcPts) 
-# 4. emm contrasts between test and control at specific points (contTc)
-
-# 2: run models that look at test and control:
-mTc <- choices %>%
-  # keep only the experiments that have a test AND control phase
-  group_by(experiment) %>%
-  filter(n_distinct(manipulation) > 1) %>% 
-  # important to drop unused factors otherwise there are lists of experiments with no data
-  split(.$experiment, drop = T) %>%
-  map( ~ glmer(
-    decision ~ rank_trial * manipulation + sideAlt_trial + reward_side +
-      (1 | individual),
-           data = .x, family = binomial))
-# it might be best to run this as one combined model to handle 'day' better. im excluding it for now as i have no idea what impact it would have
-# get resuls into tidy format
-mTcTidy <- map_df(mTc, broom.mixed::tidy, conf.int = T, .id = "experiment") %>%
-  left_join(
-    unique(choices[, c("experiment", "nat_or_art")]),
-    by = "experiment"
-  )
-
-# generate predictions for all trials and contrasts for specific trials
-emmPredCont <- map2(
-  .x = mTc, .y = names(mTc),
-  function(m, exp_id) {
-    
-    # below line allows to only keep predictions from control that actually occur 
-    # (in concert w semi-join)
-    obs <- model.frame(m) %>% distinct(manipulation, rank_trial) 
-    # get test end trial number for contrast test
-    testEnd <- max(obs[obs$manipulation == "test",]$rank_trial)
-    ctrlStart <- 1
-    
-    # get predictions for all trials
-    emmAll <- emmeans(m, ~ rank_trial * manipulation,
-          cov.keep = "rank_trial", # gets predictions for every trial rather than covariate avg
-          type = "response") %>%
-      as.data.frame() %>%
-      semi_join(obs, by = c("manipulation", "rank_trial")) %>%
-      mutate(experiment = exp_id)
-    
-    # get predictions for trials to contrast (end test and start control)
-    emmCont <- emmeans(
-      m, ~ manipulation * rank_trial,
-      at = list(rank_trial = c(ctrlStart, testEnd))
-    )
-    # exclude end control and start trial predictions
-    emmCont <- subset(
-      emmCont,
-      (manipulation == "control" & rank_trial == ctrlStart) |
-      (manipulation == "test"    & rank_trial == testEnd)
-    )
-    # ChatGPT code below. Make sure order is control@start then test@end
-    grid <- emmCont@grid
-    # below line sorts first by manipulation (control evaluates to FALSE / zero)
-    # then by rank_trial
-    ord <- order(grid$manipulation == "test", grid$rank_trial)
-    emmCont <- emmCont[ord]
-
-    cont <- contrast(
-      emmCont,
-      list("test_end - control_start" = c(-1, 1))
-    )
-    # cont <- pairs(emmCont) This is the alternative to running the custom contrast
-
-    # For reporting, you may want both link-scale test and response-scale summary
-    # infer T,T includes confint as well
-    contLink <- summary(cont, infer = c(T, T)) %>% 
-      rename(logOddsRatio = estimate) %>%
-      mutate(
-        experiment = exp_id,
-        control_start = ctrlStart,
-        test_end = testEnd
-      )
-
-    contResp <- as.data.frame(summary(cont, type = "response")) %>%
-      mutate(
-        experiment = exp_id,
-        control_start = ctrlStart,
-        test_end = testEnd
-      )
-
-    list(emmAll = emmAll, contLink = contLink, contResp = contResp)
-    
-})
-
-# imagine list of lists like a table, this flips rows and cols
-emmPredCont <- transpose(emmPredCont) 
-# bind the elements within each list together
-emmPredCont <- map(emmPredCont, list_rbind)
-emmTcAll <- emmPredCont[["emmAll"]]
-contTcLn <- emmPredCont[["contLink"]]
-contTcRsp <- emmPredCont[["contResp"]]
-rm(list = c("emmPredCont"))
-
-# bring in the nat vs art variable
-emmTcAll <- left_join(
-  emmTcAll,
-  unique(choices[, c("experiment", "nat_or_art")]),
-  by = "experiment")
-
-contTcLn <- left_join(
-  contTcLn,
-  unique(choices[, c("experiment", "nat_or_art")]),
-  by = "experiment"
-)
-
-# predictions for specific trials (end of the test and the start of the control) 
-# by subsetting all trials predictions
-emmTcPts <- emmTcAll %>% 
-  group_by(nat_or_art, experiment, manipulation) %>%
-  filter(manipulation == "test" & rank_trial == max(rank_trial) | 
-           manipulation == "control" & rank_trial == 1) 
-# the alternative is to use predict and things get real complicated then. 
-# honestly i think the reality is actually that predict would work fine, because the other variables in the models hardly have effects?
-# and what if i just ran predict on the dataframe itself? didnt i do something like that initially?
-
-```
-
-```{r formatTestDataStructures}
-
-# here we produce MS and inLine ready tables for: 
-# 1. contrasts,
-# 2. predictions at different points
-# 3. model coefficients 
-# 4. rank trial slope / effects
-
 source("functions/format_numeric_cols.R")
-source("functions/make_confint_col.R")
-source("functions/format_tables.R")
 
-term_labels <- c(
-  "(Intercept)"      = "int",
-  "rank_trial"       = "trial",
-  "reward_sideRight" = "sideR",
-  "sideAlt_trialTRUE" = "sideAltT"
-)
-
-formattingTablesDir <- "scripts/glm_analysis/formatting_tables"
-sourceFmt <- function(file) source(file.path(formattingTablesDir, file))
-
-sourceFmt("format_emmTestPts.R") # outputs inLine and MsTab objects 
-# outputs inLine and MsTab objects for slope and model generally
-sourceFmt("format_mTestTidy.R") 
-
-testRes <- list(
-  emmAll = emmTestAll,
-  emmPts = emmTestPts,
-  emmPtsInLine = emmTestPtsInLine,
-  emmPtsMsTab = emmTestPtsMsTab,
-  mCoefs = mTestTidy,
-  mCoefsInLine = mTestTidyWideInLine,
-  mCoefsMsTab = mTestCoefsMsTab,
-  trialSlopeInLine = testTrialSlopeInLine,
-  trialSlopeMsTab = testTrialSlopeMsTab
-)
-
-rm(
-  mTest, mTestTidy, mTestTidyInLine, mTestTidyWideInLine,
-  testTrialSlopeInLine, testTrialSlopeMsTab, mTestCoefsMsTab,
-  emmTestAll, emmTestPts, emmTestPtsInLine,
-  term_labels
-)
-
-rm(sourceFmt, formattingTablesDir)
-
-```
-
-```{r formatTcDataStructures}
-source("functions/format_numeric_cols.R")
-source("functions/make_confint_col.R")
-source("functions/format_tables.R")
-
-term_labels <- c(
-  "(Intercept)"      = "int",
-  "rank_trial"       = "trial",
-  "reward_sideRight" = "sideR",
-  "sideAlt_trialTRUE" = "sideAltT"
-)
-
-formattingTablesDir <- "scripts/glm_analysis/formatting_tables"
-sourceFmt <- function(file) source(file.path(formattingTablesDir, file))
-
-sourceFmt("format_emmTcPts.R") # outputs inLine and MsTab objects
-sourceFmt("format_contTcLn.R") # outputs inLine and MsTab objects
-sourceFmt("format_mTcTidy.R") # outputs inLine and MsTab objects
-
-tcRes <- list(
-  mCoefsInLine = mTcTidyWideInLine,
-  mCoefsMsTab = mTcCoefsMsTab,
-  contrastsInLine = contTcLnInLine,
-  contrastsMsTab = contTcLnMsTab,
-  emmPtsInLine = emmTcPtsInLine,
-  emmPtsMsTab = emmTcPtsMsTab,
-  emmAll = emmTcAll,
-  emmPts = emmTcPts,
-  trialSlopeInLine = tcTrialSlopeInLine,
-  trialSlopeMsTab = tcTrialSlopeMsTab
-)
-
-rm(
-  mTc, mTcTidy, mTcTidyInLine, mTcTidyWideInLine,
-  tcTrialSlopeInLine, tcTrialSlopeMsTab, mTcCoefsMsTab,
-  mTcTidyFmt,
-  emmTcAll, emmTcPts, emmTcPtsInLine,
-  contTcLn, contTcLnInLine, contTcLnMsTab, contTcRsp,
-  term_labels
-)
-
-rm(sourceFmt, formattingTablesDir)
-
-```
-
-```{r buildRollingChoices}
-# create a rolling-mean dataframe so underlying raw-data can be visualised
-choices_rolling <- choices %>%
-  arrange(rank_trial) %>%
-  # keep nat or art along for the ride for easy subsetting later
-  group_by(individual, experiment, nat_or_art, manipulation) %>%
-  mutate(
-    pcorr = rollmean(decision, k = 3, fill = NA, align = "center")
-  ) %>%
-  # average across individuals
-  ungroup() %>% 
-  group_by(rank_trial, experiment, nat_or_art, manipulation) %>%
-  summarise(pcorr = mean(pcorr))
-
+load("scripts/glm_analysis/formatted_results.RData")
 ```
 
 # Question 1: Can wasps discriminate a 'simple' artificial dorsal pattern?
@@ -384,21 +58,11 @@ rewarding patterns drops when the patterns are removed from the roof
 #| fig-cap: 'Wasp reward navigation performance during the test and control phases of the perpendicular-parallel Y-maze experiment. During the test phase perpendicular and parallel overhead stimuli could be used by the wasps to choose which of two chambers held the reward, but during the subsequent control these stimuli were removed. The y-axis represents the proportion of all entries ("choices") that were into the rewarding ("correct") chamber. The solid black line represents the predicted mean proportion of correct decisions across trial number and the grey ribbon the 95% confidence interval around these predictions provided by the model. Grey points represent the rolling mean of the proportion of correct choices in 3-trial wide windows across all wasps present in those trials. Black points represent the predicted proportion of correct choices at the end of the test and the start of the control phases, and the error bars the 95% confidence intervals around these predictions. Only the first choice of each wasp in each trial was used as data in the model and to calculate the rolling means. The dashed horizontal line represents chance performance (50%).'
 
 q1ID <- "perpPara_170725"
-# this function allows you to subset not just by columns but also rownames
-tcResQ1 <- lapply(tcRes, function(x) {
-  if ("experiment" %in% colnames(x)) {
-    dplyr::filter(x, experiment == q1ID)
-  } else if (q1ID %in% rownames(x)) {
-    x[q1ID, , drop = FALSE]
-  } else {
-    x
-  }
-})
-mCoefsInLineQ1 <- tcResQ1$mCoefsInLine
-contrastsInLineQ1 <- tcResQ1$contrastsInLine
-emmTcPtsInLineQ1 <- tcResQ1$emmPtsInLine
-emmPtsQ1 <- tcResQ1$emmPts
-emmAllQ1 <- tcResQ1$emmAll
+mCoefsInLineQ1    <- tcRes$mCoefsInLine[q1ID, , drop = FALSE]
+contrastsInLineQ1 <- tcRes$contrastsInLine[q1ID, , drop = FALSE]
+emmPtsInLineQ1    <- emmPtsInLine[q1ID, , drop = FALSE]
+emmPtsQ1          <- emmPts %>% filter(experiment == q1ID)
+emmAllQ1          <- emmAll %>% filter(experiment == q1ID)
 
 df_rolling <- choices_rolling %>% filter(experiment == q1ID)
 
@@ -421,7 +85,6 @@ p <- p +
   geom_point(data = emmPtsQ1, aes(x = rank_trial, y = prob))
 
 p
-
 ```
 
 During the test phase of the experiment, trial number (experience) had a
@@ -433,14 +96,14 @@ every successive trial increasing the log odds of a correct decision by
 p`r mCoefsInLineQ1$rank_trial_pFmt`).
 
 The $P_{\mathrm{corr}}$ of a correct choice at the end of the test was
-$P_{\mathrm{corr}}$ = `r emmTcPtsInLineQ1$prob_testEnd` (95% CI
-`r emmTcPtsInLineQ1$confint_testEnd`), which is significantly higher than chance as implied by the lower bound of the 95%
+$P_{\mathrm{corr}}$ = `r emmPtsInLineQ1$last_test_prob` (95% CI
+`r emmPtsInLineQ1$last_test_confint`), which is significantly higher than chance as implied by the lower bound of the 95%
 confidence interval for $P_{\mathrm{corr}}$ being \>50% (black
 error bar in the @fig-q1 test panel does not overlap the horizontal dashed
 line). Furthermore, the $P_{\mathrm{corr}}$ at the end of the experiment
 was also significantly higher than at the start of the control
-($P_{\mathrm{corr}}$ = `r emmTcPtsInLineQ1$prob_ctrlStart`, 95% CI
-`r emmTcPtsInLineQ1$confint_ctrlStart`), and this difference was
+($P_{\mathrm{corr}}$ = `r emmPtsInLineQ1$ctrl_start_prob`, 95% CI
+`r emmPtsInLineQ1$ctrl_start_confint`), and this difference was
 significant (log odds ratio = `r contrastsInLineQ1$logOddsRatio`, p
 `r contrastsInLineQ1$pFmt`) (@fig-q1, note lack of overlap of error bars
 between test and control panel).
@@ -464,8 +127,8 @@ phase (black points) that are clustered around 50%.
 
 ```{r q1Cleanup}
 rm(
-  q1ID, tcResQ1, mCoefsInLineQ1, contrastsInLineQ1,
-  emmTcPtsInLineQ1, emmPtsQ1, emmAllQ1,
+  q1ID, mCoefsInLineQ1, contrastsInLineQ1,
+  emmPtsInLineQ1, emmPtsQ1, emmAllQ1,
   df_rolling, p
 )
 ```
@@ -477,14 +140,8 @@ rm(
 
 q2ExpOrder <- c("thinOb_150823", "brightDiff_250725")
 
-emmThinObTcAll <- tcRes$emmAll %>%
-  filter(experiment == "thinOb_150823")
-
-emmBrightTestAll <- testRes$emmAll %>%
-  filter(experiment == "brightDiff_250725") %>%
-  mutate(manipulation = "test")
-
-emmArtPlotAll <- bind_rows(emmThinObTcAll, emmBrightTestAll) %>%
+emmArtPlotAll <- emmAll %>%
+  filter(experiment %in% q2ExpOrder) %>%
   mutate(
     experiment = factor(experiment, levels = q2ExpOrder),
     manipulation = factor(manipulation, levels = c("test", "control"))
@@ -499,7 +156,6 @@ p <- ggplot(emmArtPlotAll, aes(x = rank_trial, y = prob)) +
   plotStyle$themeTextEnlarged +
   facet_grid(experiment ~ manipulation, scales = "free_x")
 
-# add binned points from master rolling object
 df_rolling <- choices_rolling %>%
   filter(experiment %in% q2ExpOrder) %>%
   mutate(
@@ -510,14 +166,9 @@ df_rolling <- choices_rolling %>%
 p <- p + geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr),
                     colour = "black", alpha = 0.1)
 
-# to add the prediction points, ill need a new combined df
-emmThinObTcPts <- tcRes$emmPts %>% filter(experiment == "thinOb_150823")
-emmBrightTestPts <- testRes$emmPts %>%
-  filter(experiment == "brightDiff_250725",
-         rank_trial == max(rank_trial)) %>%
-  mutate(manipulation = as.factor("test"))
-  # order changes to control / brightDiff first unless you make these a factor
-emmPtsQ2 <- rbind(emmThinObTcPts, emmBrightTestPts) %>%
+emmPtsQ2 <- emmPts %>%
+  filter(experiment %in% q2ExpOrder,
+         trial_pos %in% c("last_test", "ctrl_start")) %>%
   mutate(experiment = factor(experiment, levels = q2ExpOrder))
 
 p <- p +
@@ -528,31 +179,22 @@ p <- p +
 
 p
 
-# table used in Q2 inline writing (from master display table)
-emmArt <- testRes$emmPtsInLine %>%
+# table used in Q2 inline writing
+emmArt <- emmPtsInLine %>%
   tibble::rownames_to_column("experiment") %>%
   filter(nat_or_art == "artificial") %>%
   tibble::column_to_rownames("experiment")
-
 ```
 
 ```{r q2ContrastArtStimuli}
-# Option 2: one-row-per-experiment trial-slope table for Q2
 q2ArtTableOrder <- c("perpPara_170725", "thinOb_150823", "brightDiff_250725")
 
 q2TrialSlopeTable <- testRes$trialSlopeInLine %>%
   filter(nat_or_art == "artificial") %>%
   select(-nat_or_art)
 
-# hidden for now: unhide by uncommenting the block below
-# formatSlopeTable(
-#   q2TrialSlopeTable,
-#   caption = "Q2 trial-slope summary by artificial experiment"
-# )
-
 q2ArtTcContrastTable <- tcRes$contrastsMsTab %>%
   filter(nat_or_art == "artificial") %>%
-  # for ordering eg tabls. could be moved earlier like to loading cleaning
   mutate(experiment = forcats::fct_relevel(experiment, q2ArtTableOrder)) %>%
   arrange(experiment) %>%
   select(
@@ -567,9 +209,9 @@ q2ArtTcContrastTable <- tcRes$contrastsMsTab %>%
     `P` = pFmt,
     `Test end trial` = testEndTrial
   )
+
 q2ArtModelTable <- testRes$mCoefsMsTab %>%
   filter(nat_or_art == "artificial") %>%
-  # for ordering eg tabls. could be moved earlier like to loading cleaning
   mutate(experiment = forcats::fct_relevel(experiment, q2ArtTableOrder)) %>%
   arrange(experiment, term) %>%
   select(
@@ -584,11 +226,6 @@ q2ArtModelTable <- testRes$mCoefsMsTab %>%
     `Log-odds [95% CI]` = logOdds95CI,
     `P` = pFmt
   )
-
-# to do: mstab should be used here above, why isnt it?
-# I don't think this trial slope table is necessary. Just have a model coefficient table per experiment in the supp.
-
-
 ```
 
 To answer whether wasps require optic flow information to discriminate
@@ -612,8 +249,8 @@ successive trial increasing the log odds of a correct decision by
 Initially (at trial 1) performance was not significantly different from
 chance ($P_{\mathrm{corr}}$ = `r emmArt["thinOb_150823", "first_prob"]`,
 95% CI `r emmArt["thinOb_150823", "first_confint"]`) but rose steeply,
-reaching `r emmArt["thinOb_150823", "last_prob"]` (95% CI
-`r emmArt["thinOb_150823", "last_confint"]`) by the end of the
+reaching `r emmArt["thinOb_150823", "last_test_prob"]` (95% CI
+`r emmArt["thinOb_150823", "last_test_confint"]`) by the end of the
 experiment (trial 66), which is significantly higher than expected by
 chance (50%). $P_{\mathrm{corr}}$ at the end of the test phase of the
 experiment was also higher than at the start of the control (log odds ratio = `r tcRes$contrastsInLine["thinOb_150823","logOddsRatio"]`, 95% CI `r tcRes$contrastsInLine["thinOb_150823","confint"]`, p`r tcRes$contrastsInLine["thinOb_150823","pFmt"]`).
@@ -633,8 +270,8 @@ was not significantly different from 50% ($P_{\mathrm{corr}}$ =
 `r emmArt["brightDiff_250725", "first_prob"]`, 95% CI
 `r emmArt["brightDiff_250725", "first_confint"]`) but rises with
 experience and by the end of the experiment (trial 26)
-$P_{\mathrm{corr}}$ reached `r emmArt["brightDiff_250725", "last_prob"]`
-(95% CI `r emmArt["brightDiff_250725", "last_confint"]`). Performance at
+$P_{\mathrm{corr}}$ reached `r emmArt["brightDiff_250725", "last_test_prob"]`
+(95% CI `r emmArt["brightDiff_250725", "last_test_confint"]`). Performance at
 the end of the experiment is only borderline significantly higher than
 50% because of the increased uncertainty in the slope / effect of trials
 on performance due to the lower number of trials run in this experiment.
@@ -643,7 +280,7 @@ the 50% line, they are significantly different (for example, comparing
 performance at an intermediate trial or comparing the average
 performance of the last five trials to the 50% line).
 
-*Comparison among different artificial stimuli* 
+*Comparison among different artificial stimuli*
 
 ```{r tbl-q2-art-contrast}
 #| tbl-cap: "Artificial test-control contrasts (test end vs control start)."
@@ -663,39 +300,16 @@ knitr::kable(
 
 # Question 3: Can wasps use naturalistic patterns for navigation?
 
--   Are performances different from 50%?
--   Are performances different from the control?
--   Are there differences in performance between naturalistic and
-    artificial stimuli?
-
 ```{r fig-q3-test}
 #| fig-cap: "Naturalistic test performance over trials."
+#| fig-height: 8
 
-emmNatTestAll <- testRes$emmAll %>% filter(nat_or_art == "naturalistic")
-emmNatTestPtsLong <- testRes$emmPts %>% filter(nat_or_art == "naturalistic")
-emmNatTestPts <- testRes$emmPtsInLine %>% filter(nat_or_art == "naturalistic")
+emmNatTestAll     <- emmAll %>% filter(nat_or_art == "naturalistic", manipulation == "test")
+emmNatTestPtsLong <- emmPts %>% filter(nat_or_art == "naturalistic")
+emmNatTestPts     <- emmPtsInLine %>% filter(nat_or_art == "naturalistic")
 
-# use master rolling object
 df_rolling <- choices_rolling %>%
   filter(manipulation == "test", nat_or_art == "naturalistic")
-
-ggplot(emmNatTestAll, 
-            aes(x = rank_trial, y = prob)) +
-  geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr),
-               colour = "black", alpha = 0.1) +
-  geom_line() +
-  geom_ribbon(
-    aes(ymin = asymp.LCL, ymax = asymp.UCL),
-    alpha = 0.15,
-    colour = NA
-  ) +
-  ylim(0, 1) +
-  geom_hline(yintercept = 0.5, linetype = "dashed") +
-  facet_wrap(vars(experiment), ncol =4)+
-  ylab("P(correct)")+
-  theme_bw()+ 
-  theme(legend.position = "none")
-
 
 ```
 
@@ -708,26 +322,22 @@ able to separate certain pairs of naturalistic canopies, although the performanc
 
 ```{r fig-q3-tc}
 #| fig-cap: "Naturalistic test-control performance over trials."
+#| fig-height: 6
 
-# control comparison: compare the control to the test
-# bring in the predictions across all trials and the subset for end of test and start of control
-emmNatTcAll <- tcRes$emmAll %>% filter(nat_or_art == "naturalistic")
-emmNatTcPts <- tcRes$emmPts %>% filter(nat_or_art == "naturalistic")
-tbNatTcPts <- tcRes$emmPtsInLine %>% filter(nat_or_art == "naturalistic")
 
-## is this whole section below necessary?? 
-# below line just checks which naturalistic experiments have a test and control
+emmNatTcAll <- emmAll %>% filter(nat_or_art == "naturalistic")
+emmNatTcPts <- emmPts %>% filter(nat_or_art == "naturalistic")
+tbNatTcPts  <- emmPtsInLine %>% filter(nat_or_art == "naturalistic")
+
 expTestAndCtrl <- names(
   which(
-    tapply(choices$manipulation, choices$experiment,
+    tapply(choices_rolling$manipulation, choices_rolling$experiment,
            function(x) length(unique(x)) > 1)))
 
 choicesRollTc <- choices_rolling %>%
-  filter(nat_or_art == "naturalistic" & experiment %in% expTestAndCtrl) 
+  filter(nat_or_art == "naturalistic" & experiment %in% expTestAndCtrl)
 
-# add the best fit line and CIs to plots
-p <- ggplot(emmNatTcAll,
-            aes(x = rank_trial, y = prob)) +
+p <- ggplot(emmNatTcAll, aes(x = rank_trial, y = prob)) +
   geom_line() +
   geom_ribbon(
     aes(ymin = asymp.LCL, ymax = asymp.UCL),
@@ -736,85 +346,44 @@ p <- ggplot(emmNatTcAll,
   ) +
   ylim(0, 1) +
   geom_hline(yintercept = 0.5, linetype = "dashed") +
-  facet_grid(experiment ~ manipulation)+
-  ylab("P(correct)")+
-  theme_bw()+ 
+  facet_grid(experiment ~ manipulation, scales = "free_x") +
+  ylab("P(correct)") +
+  theme_bw() +
   theme(legend.position = "none")
 
 p <- p + geom_point(data = choicesRollTc, aes(x = rank_trial, y = pcorr),
                     colour = "black", alpha = 0.1)
-
 p
-
-p <- ggplot(emmNatTcPts, aes(x = manipulation, y = prob,
-                               ymin = asymp.LCL, ymax = asymp.UCL)) +
-  geom_point() +
-  geom_errorbar(aes()) +
-  ylim(0, 1) +
-  geom_hline(yintercept = 0.5, linetype = "dashed") +
-  facet_wrap(vars(experiment), scales = "free")+
-  ylab("P(correct)")+
-  theme(legend.position = "none")
-
-# can compare the average of the n control trials to the average of the last n test trials 
-# could look at wasps present / days / other variables to 
-# make sure they're somewhat equal between the comparisons
-
 ```
 
 ```{r q3Table}
-q3NatTcPtsTable <- tcRes$emmPtsMsTab %>%
+q3NatPtsTable <- emmPtsMsTab %>%
   filter(nat_or_art == "naturalistic") %>%
-  select(
-    experiment,
-    testEndPcorr95CI,
-    controlStartPcorr95CI,
-    testEndTrial
-  )
-
-q3NatTestPtsTable <- testRes$emmPtsMsTab %>%
-  filter(nat_or_art == "naturalistic") %>%
-  mutate(controlStartPcorr95CI = NA) %>%
-  select(
-    experiment,
-    testEndPcorr95CI,
-    controlStartPcorr95CI,
-    testEndTrial
-  )
-rbind(q3NatTcPtsTable, q3NatTestPtsTable)
+  select(experiment, lastTestPcorr95CI, ctrlStartPcorr95CI, lastTestTrial)
 
 q3NatTcContrastTable <- tcRes$contrastsMsTab %>%
   filter(nat_or_art == "naturalistic") %>%
-  select(
-    experiment,
-    logOddsRatio95CI,
-    pFmt,
-    testEndTrial
-  ) %>%
+  select(experiment, logOddsRatio95CI, pFmt, testEndTrial) %>%
   rename(
     `Experiment` = experiment,
     `Log-odds ratio [95% CI]` = logOddsRatio95CI,
     `P` = pFmt,
     `Test end trial` = testEndTrial
   )
-
-```
-
-```{r q3TablePts}
-# table with pcorr at start and end of experiment and last trial #
-
 ```
 
 ```{r tbl-q3-nat-tc-pts}
 #| tbl-cap: "Naturalistic test-control performance at test end and control start."
-
-
-
 knitr::kable(
-  q3NatTcPtsTable,
+  q3NatPtsTable,
   booktabs = TRUE
 )
 ```
+
+Of the four naturalistic canopies that show $P_{\mathrm{corr}}$ \> 50%, after three of those we also ran a control (patterns removed) directly after the test phase concluded, but in only one case (natcan1_170923) was the $P_{\mathrm{corr}}$ at the end of the test significantly higher than at the start of the control. This can be attributed to the fact that $P_{\mathrm{corr}}$ for the naturalistic
+canopies is generally not much greater than 50% (if at all), and the
+fact that control experiments were not run for many trials, increasing
+the uncertainty around the $P_{\mathrm{corr}}$ during the control phase.
 
 ```{r tbl-q3-nat-tc-contrast}
 #| tbl-cap: "Naturalistic test-control contrasts (test end vs control start)."
@@ -824,18 +393,16 @@ knitr::kable(
 )
 ```
 
-Of the four naturalistic canopies that show $P_{\mathrm{corr}}$ \> 50%, after three of those we also ran a control (patterns removed) directly after the test phase concluded, but in only one case (natcan1_170923) was the $P_{\mathrm{corr}}$ at the end of the test significantly higher than at the start of the control. This can be attributed to the fact that $P_{\mathrm{corr}}$ for the naturalistic 
-canopies is generally not much greater than 50% (if at all), and the 
-fact that control experiments were not run for many trials, increasing 
+Of the four naturalistic canopies that show $P_{\mathrm{corr}}$ \> 50%, after three of those we also ran a control (patterns removed) directly after the test phase concluded, but in only one case (natcan1_170923) was the $P_{\mathrm{corr}}$ at the end of the test significantly higher than at the start of the control. This can be attributed to the fact that $P_{\mathrm{corr}}$ for the naturalistic
+canopies is generally not much greater than 50% (if at all), and the
+fact that control experiments were not run for many trials, increasing
 the uncertainty around the $P_{\mathrm{corr}}$ during the control phase.
 
 ```{r fig-q3-natart}
 #| fig-cap: "End-of-test predicted performance by canopy type."
 
-q3NatArtEndPts <- testRes$emmPts %>%
-  group_by(experiment, nat_or_art) %>%
-  filter(rank_trial == max(rank_trial)) %>%
-  ungroup() %>%
+q3NatArtEndPts <- emmPts %>%
+  filter(trial_pos == "last_test") %>%
   mutate(
     nat_or_art = factor(nat_or_art, levels = c("naturalistic", "artificial"))
   )
@@ -844,21 +411,19 @@ natArtMean <- q3NatArtEndPts %>%
   group_by(nat_or_art) %>%
   summarise(
     mean_prob = mean(prob),
-    min_prob = min(prob),
-    max_prob = max(prob),
+    min_prob  = min(prob),
+    max_prob  = max(prob),
     .groups = "drop"
   ) %>%
   pivot_wider(
-    names_from = nat_or_art,
+    names_from  = nat_or_art,
     values_from = c(mean_prob, min_prob, max_prob),
-    names_glue = "{nat_or_art}_{.value}"
+    names_glue  = "{nat_or_art}_{.value}"
   ) %>%
-  mutate(
-    diff_mean_prob = artificial_mean_prob - naturalistic_mean_prob
-  ) %>%
+  mutate(diff_mean_prob = artificial_mean_prob - naturalistic_mean_prob) %>%
   fmtNumCols()
 
-q3NatBest <- q3NatArtEndPts %>%
+q3NatBest  <- q3NatArtEndPts %>%
   filter(nat_or_art == "naturalistic") %>%
   slice_max(order_by = prob, n = 1, with_ties = FALSE) %>%
   fmtNumCols()
@@ -868,44 +433,24 @@ q3ArtWorst <- q3NatArtEndPts %>%
   slice_min(order_by = prob, n = 1, with_ties = FALSE) %>%
   fmtNumCols()
 
-ptJitter <- position_jitter(width = 0.08, height = 0, seed = 3)
+ptJitter   <- position_jitter(width = 0.08, height = 0, seed = 3)
 canopyCols <- c(naturalistic = "forestgreen", artificial = "black")
 
 ggplot(q3NatArtEndPts, aes(x = nat_or_art, y = prob)) +
   geom_hline(yintercept = 0.5, linetype = "dashed") +
-  geom_boxplot(
-    aes(color = nat_or_art),
-    width = 0.2,
-    outlier.shape = NA
-  ) +
+  geom_boxplot(aes(color = nat_or_art), width = 0.2, outlier.shape = NA) +
   geom_errorbar(
     aes(ymin = asymp.LCL, ymax = asymp.UCL, color = nat_or_art),
-    width = 0.03,
-    alpha = 0.3,
-    position = ptJitter
+    width = 0.03, alpha = 0.3, position = ptJitter
   ) +
-  geom_point(
-    aes(color = nat_or_art),
-    size = 2,
-    alpha = 0.1,
-    position = ptJitter
-  ) +
+  geom_point(aes(color = nat_or_art), size = 2, alpha = 0.1, position = ptJitter) +
   scale_color_manual(values = canopyCols, guide = "none") +
   scale_y_continuous(limits = c(0, 1)) +
-  labs(
-    x = "Canopy type",
-    y = "Predicted P(correct) at end of test"
-  ) +
+  labs(x = "Canopy type", y = "Predicted P(correct) at end of test") +
   theme_bw()
-
-# calculate summary stats of nat vs art
-
-# Todo 
-# I think it would be nice to complement this 'raincloud' plot with the lineplots of artificial and naturalistic side-by-side (these lineplots that appear in prev figs)
-
 ```
 
-*Performance differences among naturalistic and artificial stimuli* 
+*Performance differences among naturalistic and artificial stimuli*
 
 Discrimination performance for naturalistic canopies tends
 to be lower than for artificial canopies. The naturalistic canopy
@@ -925,80 +470,40 @@ canopies.
 # Supplementary
 
 ```{r supplementaryMsTabs}
-
-# to do: 
-# table S1: round to 2 decimal places, combine middle trial number and end trial number columns
-# Table S2: break this up visually per experiment and order by nat or art 
-
-
-# arrange all experiments in tables by nat vs art column
-# change CI separation to use , or ;
-# merge contrast and pts predictions tables for tc data?
-# where is the control coefficient for tc model results?
-# abbreviate testEndTrial to TrEnd
-# Break up model results by experiment, stop repetition within experiment column
-# Proper table captions
-# - Numerate tables with s prefix
-
-# S1 formatting: round numeric text to 2 decimals, and merge middle/end trial cols
 roundNumsInString <- function(x, digits = 2) {
   vapply(
     x,
     function(s) {
       nums <- regmatches(s, gregexpr("-?[0-9]+\\.?[0-9]*", s, perl = TRUE))[[1]]
-      if (length(nums) == 0) {
-        return(s)
-      }
-      out <- s
+      if (length(nums) == 0) return(s)
+      out     <- s
       rounded <- sprintf(paste0("%.", digits, "f"), as.numeric(nums))
-      for (i in seq_along(nums)) {
-        out <- sub(nums[i], rounded[i], out, fixed = TRUE)
-      }
+      for (i in seq_along(nums)) out <- sub(nums[i], rounded[i], out, fixed = TRUE)
       out
     },
     character(1)
   )
 }
 
-s1TestPtsMsTab <- testRes$emmPtsMsTab %>%
+s1PtsMsTab <- emmPtsMsTab %>%
   mutate(
-    across(
-      c(startPcorr95CI, midPcorr95CI, endPcorr95CI),
-      ~ roundNumsInString(.x, digits = 2)
-    ),
-    `mid, end trial #` = paste(middleTrial, endTrial, sep = ", ")
+    across(c(firstPcorr95CI, midPcorr95CI, lastTestPcorr95CI, ctrlStartPcorr95CI),
+           ~ roundNumsInString(.x, digits = 2)),
+    `last test trial` = lastTestTrial
   ) %>%
-  select(-middleTrial, -endTrial)
-
+  select(-lastTestTrial)
 
 suppMsTabs <- list(
-  "Test predictions at start, middle, and end trials" =
-    s1TestPtsMsTab,
-  "Test-control predictions at test end and control start" =
-    tcRes$emmPtsMsTab,
-  "Test-control contrast summary" =
-    tcRes$contrastsMsTab,
-  "Test trial-slope summary" =
-    testRes$trialSlopeMsTab,
-  "Test-control trial-slope summary" =
-    tcRes$trialSlopeMsTab,
-  "Test model coefficients" =
-    testRes$mCoefsMsTab,
-  "Test-control model coefficients" =
-    tcRes$mCoefsMsTab
-
+  "Predictions at first, middle, last test, and control start" = s1PtsMsTab,
+  "Test-control contrast summary"                              = tcRes$contrastsMsTab,
+  "Test trial-slope summary"                                   = testRes$trialSlopeMsTab,
+  "Test-control trial-slope summary"                           = tcRes$trialSlopeMsTab,
+  "Test model coefficients"                                    = testRes$mCoefsMsTab,
+  "Test-control model coefficients"                            = tcRes$mCoefsMsTab
 )
 
 purrr::iwalk(suppMsTabs, function(tbl, cap) {
-  print(
-    knitr::kable(
-      tbl,
-      caption = cap,
-      booktabs = TRUE
-    )
-  )
+  print(knitr::kable(tbl, caption = cap, booktabs = TRUE))
   cat("\n\n")
 })
-
-
 ```

@@ -1,3 +1,7 @@
+# object created:
+# mTestTidyFmt, mTestTidyInLine, mTestTidyWideInLine, mTestCoefsMsTab,
+# testTrialSlopeInLine, testTrialSlopeMsTab
+
 mTestTidyFmt <- mTestTidy %>%
   rename(logOdds = estimate) %>%
   mutate(

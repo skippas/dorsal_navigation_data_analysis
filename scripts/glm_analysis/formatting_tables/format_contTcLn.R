@@ -16,3 +16,5 @@ contTcLnMsTab <- contTcLnInLine %>%
     pFmt,
     testEndTrial = test_end
   )
+
+contTcLnInLine <- contTcLnInLine %>% column_to_rownames("experiment")

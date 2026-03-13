@@ -16,10 +16,11 @@ emmTcPtsWide <- emmTcPts %>%
     prefix = "[",
     suffix = "]"
   ) %>%
-  select(experiment, nat_or_art, rank_trial, prob, confint, trial_pos) %>%
+  select(experiment, nat_or_art, rank_trial, prob, confint, trial_pos,
+         asymp.LCL, asymp.UCL) %>%
   pivot_wider(
     names_from = trial_pos,
-    values_from = c(prob, confint, rank_trial)
+    values_from = c(prob, confint, rank_trial, asymp.LCL, asymp.UCL)
   )
 
 emmTcPtsInLine <- emmTcPtsWide %>%

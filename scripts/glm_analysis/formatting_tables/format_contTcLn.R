@@ -1,4 +1,4 @@
-contTcLnInLine <- contTcLn %>%
+contTcLnRef <- contTcLn %>%
   mutate(pFmt = pvalue(p.value)) %>%
   fmtNumCols() %>%
   make_confint_col(
@@ -9,7 +9,7 @@ contTcLnInLine <- contTcLn %>%
     suffix = "]"
   )
 
-contTcLnMsTab <- contTcLnInLine %>%
+contTcLnTbl <- contTcLnRef %>%
   transmute(
     experiment, nat_or_art,
     logOddsRatio95CI = sprintf("%s %s", logOddsRatio, confint),
@@ -17,4 +17,4 @@ contTcLnMsTab <- contTcLnInLine %>%
     testEndTrial = test_end
   )
 
-contTcLnInLine <- contTcLnInLine %>% column_to_rownames("experiment")
+contTcLnRef <- contTcLnRef %>% column_to_rownames("experiment")

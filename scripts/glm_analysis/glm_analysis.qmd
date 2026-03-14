@@ -44,24 +44,41 @@ library(scales)
 source("functions/format_numeric_cols.R")
 
 load("scripts/glm_analysis/formatted_results.RData")
+
+# Display name lookups. Keys are raw experiment IDs; values are display names.
+artLabels <- c(
+  perpPara_170725 = "Perp/para",
+  thinOb_150823   = "Oblique \u00b145\u00b0",
+  brightDiff_250725 = "Transp./opaque"
+)
+
+natcanLabels <- c(
+  natcan1_170923 = "Canopy D",
+  natcan2_300725 = "Canopy E",
+  natcan3_080825 = "Canopy F1",
+  natcan3_190925 = "Canopy F2",
+  natcan4_180825 = "Canopy G",
+  natcan5_290825 = "Canopy H",
+  natcan6_070925 = "Canopy I"
+)
 ```
 
 # Question 1: Can wasps discriminate a 'simple' artificial dorsal pattern?
 
 Evidence that wasps can use overhead patterns comes from two
 observations. First, That the proportion of choices for the rewarding
-pattern is \>50% and second, that this proportion of decisions for the
-rewarding patterns drops when the patterns are removed from the roof
+pattern ($P_{\mathrm{corr}}$) is \>50% and second, that this proportion drops when the patterns are removed from the roof
 (during the control).
 
 ```{r fig-q1}
 #| fig-cap: 'Wasp reward navigation performance during the test and control phases of the perpendicular-parallel Y-maze experiment. During the test phase perpendicular and parallel overhead stimuli could be used by the wasps to choose which of two chambers held the reward, but during the subsequent control these stimuli were removed. The y-axis represents the proportion of all entries ("choices") that were into the rewarding ("correct") chamber. The solid black line represents the predicted mean proportion of correct decisions across trial number and the grey ribbon the 95% confidence interval around these predictions provided by the model. Grey points represent the rolling mean of the proportion of correct choices in 3-trial wide windows across all wasps present in those trials. Black points represent the predicted proportion of correct choices at the end of the test and the start of the control phases, and the error bars the 95% confidence intervals around these predictions. Only the first choice of each wasp in each trial was used as data in the model and to calculate the rolling means. The dashed horizontal line represents chance performance (50%).'
 
 q1ID <- "perpPara_170725"
-mCoefsInLineQ1    <- tcRes$mCoefsInLine[q1ID, , drop = FALSE]
-contrastsInLineQ1 <- tcRes$contrastsInLine[q1ID, , drop = FALSE]
-emmPtsInLineQ1    <- emmPtsInLine[q1ID, , drop = FALSE]
-emmPtsQ1          <- emmPts %>% filter(experiment == q1ID)
+mCoefsRefQ1    <- tcRes$mCoefsRef[q1ID, , drop = FALSE]
+contrastsRefQ1 <- tcRes$contrastsRef[q1ID, , drop = FALSE]
+emmPtsRefQ1    <- emmPtsRef[q1ID, , drop = FALSE]
+emmPtsQ1          <- emmPts %>% filter(experiment == q1ID,
+                                       trial_pos %in% c("last_test", "ctrl_start")) 
 emmAllQ1          <- emmAll %>% filter(experiment == q1ID)
 
 df_rolling <- choices_rolling %>% filter(experiment == q1ID)
@@ -73,7 +90,8 @@ p <- ggplot(data = emmAllQ1, aes(x = rank_trial))+
   scale_y_continuous(labels = scales::percent, breaks = seq(0, 1, by = 0.1))+
   geom_hline(yintercept = 0.5, lty = 2)+
   plotStyle$themeTextEnlarged+
-  facet_wrap(vars(manipulation))
+  facet_wrap(vars(manipulation))#+ cant make spacing 0 as x labels overlap
+  #theme(panel.spacing.x = unit(0, "lines"))
 
 p <- p + geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr),
                     colour = "black", alpha = 0.1)
@@ -85,28 +103,20 @@ p <- p +
   geom_point(data = emmPtsQ1, aes(x = rank_trial, y = prob))
 
 p
+
+
 ```
 
-During the test phase of the experiment, trial number (experience) had a
-significant positive effect on the expected probability
-($P_{\mathrm{corr}}$) of a correct decision (@fig-q1, solid line) with
-every successive trial increasing the log odds of a correct decision by
-`r mCoefsInLineQ1$rank_trial_logOdds` (95% CI
-`r mCoefsInLineQ1$rank_trial_confint`,
-p`r mCoefsInLineQ1$rank_trial_pFmt`).
+During the test phase, trial number had a significant positive effect on
+$P_{\mathrm{corr}}$ (@fig-q1, solid line; p`r mCoefsRefQ1$rank_trial_pFmt`),
+with $P_{\mathrm{corr}}$ rising from `r emmPtsRefQ1$first_prob` (95% CI
+`r emmPtsRefQ1$first_confint`) at trial 1 to `r emmPtsRefQ1$last_test_prob`
+(95% CI `r emmPtsRefQ1$last_test_confint`) by test end.
 
-The $P_{\mathrm{corr}}$ of a correct choice at the end of the test was
-$P_{\mathrm{corr}}$ = `r emmPtsInLineQ1$last_test_prob` (95% CI
-`r emmPtsInLineQ1$last_test_confint`), which is significantly higher than chance as implied by the lower bound of the 95%
-confidence interval for $P_{\mathrm{corr}}$ being \>50% (black
-error bar in the @fig-q1 test panel does not overlap the horizontal dashed
-line). Furthermore, the $P_{\mathrm{corr}}$ at the end of the experiment
-was also significantly higher than at the start of the control
-($P_{\mathrm{corr}}$ = `r emmPtsInLineQ1$ctrl_start_prob`, 95% CI
-`r emmPtsInLineQ1$ctrl_start_confint`), and this difference was
-significant (log odds ratio = `r contrastsInLineQ1$logOddsRatio`, p
-`r contrastsInLineQ1$pFmt`) (@fig-q1, note lack of overlap of error bars
-between test and control panel).
+End-of-test $P_{\mathrm{corr}}$ was significantly above chance (lower 95% CI
+bound \>50%; @fig-q1 test panel), and significantly above performance at the
+start of the control phase (`r emmPtsRefQ1$ctrl_start_prob`, 95% CI
+`r emmPtsRefQ1$ctrl_start_confint`; p`r contrastsRefQ1$pFmt`; @fig-q1).
 
 Also note that $P_{\mathrm{corr}}$ is significantly above chance (grey
 shaded 95% confidence ribbon in @fig-q1 does not overlap the 50% line)
@@ -127,8 +137,8 @@ phase (black points) that are clustered around 50%.
 
 ```{r q1Cleanup}
 rm(
-  q1ID, mCoefsInLineQ1, contrastsInLineQ1,
-  emmPtsInLineQ1, emmPtsQ1, emmAllQ1,
+  q1ID, mCoefsRefQ1, contrastsRefQ1,
+  emmPtsRefQ1, emmPtsQ1, emmAllQ1,
   df_rolling, p
 )
 ```
@@ -143,7 +153,8 @@ q2ExpOrder <- c("thinOb_150823", "brightDiff_250725")
 emmArtPlotAll <- emmAll %>%
   filter(experiment %in% q2ExpOrder) %>%
   mutate(
-    experiment = factor(experiment, levels = q2ExpOrder),
+    experiment = recode(experiment, !!!artLabels),
+    experiment = factor(experiment, levels = unname(artLabels[q2ExpOrder])),
     manipulation = factor(manipulation, levels = c("test", "control"))
   )
 
@@ -154,12 +165,16 @@ p <- ggplot(emmArtPlotAll, aes(x = rank_trial, y = prob)) +
   scale_y_continuous(labels = scales::percent) +
   geom_hline(yintercept = 0.5, lty = 2) +
   plotStyle$themeTextEnlarged +
-  facet_grid(experiment ~ manipulation, scales = "free_x")
+  facet_grid(experiment ~ manipulation, scales = "free_x") +
+  theme(panel.spacing.y = unit(1, "lines"),
+        panel.spacing.x = unit(0, "lines")
+)
 
 df_rolling <- choices_rolling %>%
   filter(experiment %in% q2ExpOrder) %>%
   mutate(
-    experiment = factor(experiment, levels = q2ExpOrder),
+    experiment = recode(experiment, !!!artLabels),
+    experiment = factor(experiment, levels = unname(artLabels[q2ExpOrder])),
     manipulation = factor(manipulation, levels = c("test", "control"))
   )
 
@@ -169,7 +184,10 @@ p <- p + geom_point(data = df_rolling, aes(x = rank_trial, y = pcorr),
 emmPtsQ2 <- emmPts %>%
   filter(experiment %in% q2ExpOrder,
          trial_pos %in% c("last_test", "ctrl_start")) %>%
-  mutate(experiment = factor(experiment, levels = q2ExpOrder))
+  mutate(
+    experiment = recode(experiment, !!!artLabels),
+    experiment = factor(experiment, levels = unname(artLabels[q2ExpOrder]))
+  )
 
 p <- p +
   geom_errorbar(data = emmPtsQ2,
@@ -180,7 +198,7 @@ p <- p +
 p
 
 # table used in Q2 inline writing
-emmArt <- emmPtsInLine %>%
+emmArt <- emmPtsRef %>%
   tibble::rownames_to_column("experiment") %>%
   filter(nat_or_art == "artificial") %>%
   tibble::column_to_rownames("experiment")
@@ -189,11 +207,15 @@ emmArt <- emmPtsInLine %>%
 ```{r q2ContrastArtStimuli}
 q2ArtTableOrder <- c("perpPara_170725", "thinOb_150823", "brightDiff_250725")
 
-q2TrialSlopeTable <- testRes$trialSlopeInLine %>%
+q2TrialSlopeTable <- bind_rows(
+    tcRes$trialSlopeRef  %>% tibble::rownames_to_column("experiment"),
+    testRes$trialSlopeRef %>% tibble::rownames_to_column("experiment")
+  ) %>%
   filter(nat_or_art == "artificial") %>%
-  select(-nat_or_art)
+  select(-nat_or_art) %>%
+  tibble::column_to_rownames("experiment")
 
-q2ArtTcContrastTable <- tcRes$contrastsMsTab %>%
+q2ArtTcContrastTable <- tcRes$contrastsTbl %>%
   filter(nat_or_art == "artificial") %>%
   mutate(experiment = forcats::fct_relevel(experiment, q2ArtTableOrder)) %>%
   arrange(experiment) %>%
@@ -210,21 +232,49 @@ q2ArtTcContrastTable <- tcRes$contrastsMsTab %>%
     `Test end trial` = testEndTrial
   )
 
-q2ArtModelTable <- testRes$mCoefsMsTab %>%
+# Build combined model table (artificial + naturalistic) for supplementary
+suppArtModelData <- bind_rows(tcRes$mCoefsTbl, testRes$mCoefsTbl) %>%
   filter(nat_or_art == "artificial") %>%
   mutate(experiment = forcats::fct_relevel(experiment, q2ArtTableOrder)) %>%
-  arrange(experiment, term) %>%
-  select(
-    experiment,
-    term,
-    logOdds95CI,
-    pFmt
+  arrange(experiment, term)
+
+suppNatModelData <- bind_rows(tcRes$mCoefsTbl, testRes$mCoefsTbl) %>%
+  filter(nat_or_art == "naturalistic") %>%
+  mutate(
+    experiment = recode(experiment, !!!natcanLabels),
+    experiment = factor(experiment, levels = unname(natcanLabels))
   ) %>%
+  arrange(experiment, term)
+
+suppModelData <- bind_rows(suppArtModelData, suppNatModelData)
+
+# Group anchors for pack_rows — art block
+suppArtModelGroups <- suppArtModelData %>%
+  group_by(experiment) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  mutate(
+    end   = cumsum(n),
+    start = end - n + 1,
+    label = unname(artLabels[as.character(experiment)])
+  )
+
+# Group anchors for pack_rows — nat block (row indices continue after art block)
+artNRows <- nrow(suppArtModelData)
+suppNatModelGroups <- suppNatModelData %>%
+  group_by(experiment) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  mutate(
+    end   = artNRows + cumsum(n),
+    start = end - n + 1,
+    label = as.character(experiment)
+  )
+
+suppModelTable <- suppModelData %>%
+  select(term, logOdds95CI, pFmt) %>%
   rename(
-    `Experiment` = experiment,
-    `Term` = term,
+    `Term`              = term,
     `Log-odds [95% CI]` = logOdds95CI,
-    `P` = pFmt
+    `P`                 = pFmt
   )
 ```
 
@@ -241,37 +291,26 @@ control.
 Wasps had no trouble distinguishing between oblique stripes that
 presumably produce identical rates of optic flow in the dorsal visual
 field (@fig-q2). Similar to the perpendicular-parallel experiment, trial
-had a significant positive effect on $P_{\mathrm{corr}}$, with every
-successive trial increasing the log odds of a correct decision by
-`r q2TrialSlopeTable["thinOb_150823", "logOdds"]` (95% CI
-`r q2TrialSlopeTable["thinOb_150823", "confint"]`, p
-`r q2TrialSlopeTable["thinOb_150823", "pFmt"]`; @tbl-q2-art-model).
-Initially (at trial 1) performance was not significantly different from
-chance ($P_{\mathrm{corr}}$ = `r emmArt["thinOb_150823", "first_prob"]`,
-95% CI `r emmArt["thinOb_150823", "first_confint"]`) but rose steeply,
-reaching `r emmArt["thinOb_150823", "last_test_prob"]` (95% CI
-`r emmArt["thinOb_150823", "last_test_confint"]`) by the end of the
-experiment (trial 66), which is significantly higher than expected by
-chance (50%). $P_{\mathrm{corr}}$ at the end of the test phase of the
-experiment was also higher than at the start of the control (log odds ratio = `r tcRes$contrastsInLine["thinOb_150823","logOddsRatio"]`, 95% CI `r tcRes$contrastsInLine["thinOb_150823","confint"]`, p`r tcRes$contrastsInLine["thinOb_150823","pFmt"]`).
+had a significant positive effect on $P_{\mathrm{corr}}$
+(p`r q2TrialSlopeTable["thinOb_150823", "pFmt"]`; @tbl-s-model-coefs),
+with performance rising from `r emmArt["thinOb_150823", "first_prob"]`
+(95% CI `r emmArt["thinOb_150823", "first_confint"]`) at trial 1 to
+`r emmArt["thinOb_150823", "last_test_prob"]` (95% CI
+`r emmArt["thinOb_150823", "last_test_confint"]`) by test end —
+significantly above chance (50%). $P_{\mathrm{corr}}$ at test end was also significantly above performance
+at the start of the control phase (`r emmPtsRef["thinOb_150823", "ctrl_start_prob"]`,
+95% CI `r emmPtsRef["thinOb_150823", "ctrl_start_confint"]`;
+p`r tcRes$contrastsRef["thinOb_150823","pFmt"]`).
 
 Next, we asked whether wasps could discriminate between an opaque and
 transparent roof, ie. between stimuli that carried little to no pattern
-information. While trial had a positive effect on $P_{\mathrm{corr}}$
-(beta = `r q2TrialSlopeTable["brightDiff_250725", "logOdds"]`, 95% CI
-`r q2TrialSlopeTable["brightDiff_250725", "confint"]`), unlike for the
-other two pairs of artificial stimuli this effect was not significant (p
-= `r q2TrialSlopeTable["brightDiff_250725", "pFmt"]`), likely due to the
-much shorter number of trials this experiment was run for. While
-statistical support for a positive slope is lacking, there is support
-for $P_{\mathrm{corr}}$ \> 50% towards the middle and end of the
-experiment. At the onset of the experiment (trial 1), wasp performance
-was not significantly different from 50% ($P_{\mathrm{corr}}$ =
-`r emmArt["brightDiff_250725", "first_prob"]`, 95% CI
-`r emmArt["brightDiff_250725", "first_confint"]`) but rises with
-experience and by the end of the experiment (trial 26)
-$P_{\mathrm{corr}}$ reached `r emmArt["brightDiff_250725", "last_test_prob"]`
-(95% CI `r emmArt["brightDiff_250725", "last_test_confint"]`). Performance at
+information. Trial had a positive but non-significant effect on $P_{\mathrm{corr}}$
+(p`r q2TrialSlopeTable["brightDiff_250725", "pFmt"]`; @tbl-s-model-coefs),
+likely due to the shorter number of trials run in this experiment, and
+performance rose from `r emmArt["brightDiff_250725", "first_prob"]`
+(95% CI `r emmArt["brightDiff_250725", "first_confint"]`) at trial 1 to
+`r emmArt["brightDiff_250725", "last_test_prob"]`
+(95% CI `r emmArt["brightDiff_250725", "last_test_confint"]`) by test end. Performance at
 the end of the experiment is only borderline significantly higher than
 50% because of the increased uncertainty in the slope / effect of trials
 on performance due to the lower number of trials run in this experiment.
@@ -279,8 +318,6 @@ However, if one uses other metrics or analyses to compare performance to
 the 50% line, they are significantly different (for example, comparing
 performance at an intermediate trial or comparing the average
 performance of the last five trials to the 50% line).
-
-*Comparison among different artificial stimuli*
 
 ```{r tbl-q2-art-contrast}
 #| tbl-cap: "Artificial test-control contrasts (test end vs control start)."
@@ -290,52 +327,31 @@ knitr::kable(
 )
 ```
 
-```{r tbl-q2-art-model}
-#| tbl-cap: "Artificial test-model coefficients."
-knitr::kable(
-  q2ArtModelTable,
-  booktabs = TRUE
-)
-```
-
 # Question 3: Can wasps use naturalistic patterns for navigation?
-
-```{r fig-q3-test}
-#| fig-cap: "Naturalistic test performance over trials."
-#| fig-height: 8
-
-emmNatTestAll     <- emmAll %>% filter(nat_or_art == "naturalistic", manipulation == "test")
-emmNatTestPtsLong <- emmPts %>% filter(nat_or_art == "naturalistic")
-emmNatTestPts     <- emmPtsInLine %>% filter(nat_or_art == "naturalistic")
-
-df_rolling <- choices_rolling %>%
-  filter(manipulation == "test", nat_or_art == "naturalistic")
-
-```
 
 Evidence for whether wasps can discriminate naturalistic canopies at
 above-chance rates (\>50%) is mixed. In four of the seven naturalistic
 canopy pairs we tested, the predicted $P_{\mathrm{corr}}$ by the end of
 the experiment was significantly above chance (the lower limit of the
-95% CI is \>50%, see @tbl-q3-nat-test-pts), suggesting wasps may be
+95% CI is \>50%, see @tbl-q3-nat-tc-pts), suggesting wasps may be
 able to separate certain pairs of naturalistic canopies, although the performance is generally lower than for artificial stimuli (see below).
 
 ```{r fig-q3-tc}
 #| fig-cap: "Naturalistic test-control performance over trials."
 #| fig-height: 6
 
-
-emmNatTcAll <- emmAll %>% filter(nat_or_art == "naturalistic")
-emmNatTcPts <- emmPts %>% filter(nat_or_art == "naturalistic")
-tbNatTcPts  <- emmPtsInLine %>% filter(nat_or_art == "naturalistic")
-
-expTestAndCtrl <- names(
-  which(
-    tapply(choices_rolling$manipulation, choices_rolling$experiment,
-           function(x) length(unique(x)) > 1)))
+emmNatTcAll <- emmAll %>%
+  filter(nat_or_art == "naturalistic") %>%
+  mutate(experiment = recode(experiment, !!!natcanLabels))
+emmNatTcPts <- emmPts %>%
+  filter(nat_or_art == "naturalistic",
+         trial_pos %in% c("last_test", "ctrl_start")) %>%
+  mutate(experiment = recode(experiment, !!!natcanLabels))
+tbNatTcPts  <- emmPtsRef %>% filter(nat_or_art == "naturalistic")
 
 choicesRollTc <- choices_rolling %>%
-  filter(nat_or_art == "naturalistic" & experiment %in% expTestAndCtrl)
+  filter(nat_or_art == "naturalistic") %>%
+  mutate(experiment = recode(experiment, !!!natcanLabels))
 
 p <- ggplot(emmNatTcAll, aes(x = rank_trial, y = prob)) +
   geom_line() +
@@ -349,20 +365,38 @@ p <- ggplot(emmNatTcAll, aes(x = rank_trial, y = prob)) +
   facet_grid(experiment ~ manipulation, scales = "free_x") +
   ylab("P(correct)") +
   theme_bw() +
-  theme(legend.position = "none")
+  theme(legend.position = "none", panel.spacing.y = unit(0.75, "lines"),
+        panel.spacing.x = unit(0, "lines"))
 
 p <- p + geom_point(data = choicesRollTc, aes(x = rank_trial, y = pcorr),
                     colour = "black", alpha = 0.1)
+
+p <- p +
+  geom_errorbar(data = emmNatTcPts,
+                aes(x = rank_trial, ymin = asymp.LCL, ymax = asymp.UCL),
+                width = 2) +
+  geom_point(data = emmNatTcPts, aes(x = rank_trial, y = prob))
+
 p
 ```
 
 ```{r q3Table}
-q3NatPtsTable <- emmPtsMsTab %>%
+q3NatPtsTable <- emmPtsTbl %>%
   filter(nat_or_art == "naturalistic") %>%
+  mutate(
+    experiment = recode(experiment, !!!natcanLabels),
+    experiment = factor(experiment, levels = unname(natcanLabels))
+  ) %>%
+  arrange(experiment) %>%
   select(experiment, lastTestPcorr95CI, ctrlStartPcorr95CI, lastTestTrial)
 
-q3NatTcContrastTable <- tcRes$contrastsMsTab %>%
+q3NatTcContrastTable <- tcRes$contrastsTbl %>%
   filter(nat_or_art == "naturalistic") %>%
+  mutate(
+    experiment = recode(experiment, !!!natcanLabels),
+    experiment = factor(experiment, levels = unname(natcanLabels))
+  ) %>%
+  arrange(experiment) %>%
   select(experiment, logOddsRatio95CI, pFmt, testEndTrial) %>%
   rename(
     `Experiment` = experiment,
@@ -380,7 +414,7 @@ knitr::kable(
 )
 ```
 
-Of the four naturalistic canopies that show $P_{\mathrm{corr}}$ \> 50%, after three of those we also ran a control (patterns removed) directly after the test phase concluded, but in only one case (natcan1_170923) was the $P_{\mathrm{corr}}$ at the end of the test significantly higher than at the start of the control. This can be attributed to the fact that $P_{\mathrm{corr}}$ for the naturalistic
+Of the four naturalistic canopies that show $P_{\mathrm{corr}}$ \> 50%, after three of those we also ran a control (patterns removed) directly after the test phase concluded, but in only one case (Canopy D) was the $P_{\mathrm{corr}}$ at the end of the test significantly higher than at the start of the control. This can be attributed to the fact that $P_{\mathrm{corr}}$ for the naturalistic
 canopies is generally not much greater than 50% (if at all), and the
 fact that control experiments were not run for many trials, increasing
 the uncertainty around the $P_{\mathrm{corr}}$ during the control phase.
@@ -393,7 +427,7 @@ knitr::kable(
 )
 ```
 
-Of the four naturalistic canopies that show $P_{\mathrm{corr}}$ \> 50%, after three of those we also ran a control (patterns removed) directly after the test phase concluded, but in only one case (natcan1_170923) was the $P_{\mathrm{corr}}$ at the end of the test significantly higher than at the start of the control. This can be attributed to the fact that $P_{\mathrm{corr}}$ for the naturalistic
+Of the four naturalistic canopies that show $P_{\mathrm{corr}}$ \> 50%, after three of those we also ran a control (patterns removed) directly after the test phase concluded, but in only one case (Canopy D) was the $P_{\mathrm{corr}}$ at the end of the test significantly higher than at the start of the control. This can be attributed to the fact that $P_{\mathrm{corr}}$ for the naturalistic
 canopies is generally not much greater than 50% (if at all), and the
 fact that control experiments were not run for many trials, increasing
 the uncertainty around the $P_{\mathrm{corr}}$ during the control phase.
@@ -469,7 +503,7 @@ canopies.
 
 # Supplementary
 
-```{r supplementaryMsTabs}
+```{r supplementaryTbls}
 roundNumsInString <- function(x, digits = 2) {
   vapply(
     x,
@@ -485,7 +519,7 @@ roundNumsInString <- function(x, digits = 2) {
   )
 }
 
-s1PtsMsTab <- emmPtsMsTab %>%
+s1PtsTbl <- emmPtsTbl %>%
   mutate(
     across(c(firstPcorr95CI, midPcorr95CI, lastTestPcorr95CI, ctrlStartPcorr95CI),
            ~ roundNumsInString(.x, digits = 2)),
@@ -493,17 +527,32 @@ s1PtsMsTab <- emmPtsMsTab %>%
   ) %>%
   select(-lastTestTrial)
 
-suppMsTabs <- list(
-  "Predictions at first, middle, last test, and control start" = s1PtsMsTab,
-  "Test-control contrast summary"                              = tcRes$contrastsMsTab,
-  "Test trial-slope summary"                                   = testRes$trialSlopeMsTab,
-  "Test-control trial-slope summary"                           = tcRes$trialSlopeMsTab,
-  "Test model coefficients"                                    = testRes$mCoefsMsTab,
-  "Test-control model coefficients"                            = tcRes$mCoefsMsTab
+trialSlopeTbl <- bind_rows(testRes$trialSlopeTbl, tcRes$trialSlopeTbl)
+
+allContrastsTbl <- bind_rows(q2ArtTcContrastTable, q3NatTcContrastTable)
+
+suppTbls <- list(
+  "Predictions at first, middle, last test, and control start" = s1PtsTbl,
+  "Test-control contrasts (test end vs control start)"         = allContrastsTbl,
+  "Trial slope summary"                                        = trialSlopeTbl
 )
 
-purrr::iwalk(suppMsTabs, function(tbl, cap) {
+purrr::iwalk(suppTbls, function(tbl, cap) {
   print(knitr::kable(tbl, caption = cap, booktabs = TRUE))
   cat("\n\n")
 })
+```
+
+```{r tbl-s-model-coefs}
+#| tbl-cap: "Model coefficients for all stimulus experiments."
+k <- knitr::kable(suppModelTable, booktabs = TRUE)
+allGroups <- bind_rows(suppArtModelGroups, suppNatModelGroups)
+for (i in seq_len(nrow(allGroups))) {
+  k <- kableExtra::pack_rows(k,
+    allGroups$label[i],
+    allGroups$start[i],
+    allGroups$end[i]
+  )
+}
+k
 ```

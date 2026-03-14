@@ -1,8 +1,8 @@
 # Objects created:
-# emmPtsFmt, emmPtsInLine, emmPtsMsTab
+# emmPtsFmt, emmPtsRef, emmPtsTbl
 #
 # emmPts must exist in the environment (produced by run_analysis.R).
-# Columns in emmPtsInLine: first_*, middle_*, last_test_*, ctrl_start_*
+# Columns in emmPtsRef: first_*, middle_*, last_test_*, ctrl_start_*
 # ctrl_start_* columns are NA for experiments without a control phase.
 
 emmPtsFmt <- emmPts %>%
@@ -21,10 +21,10 @@ emmPtsFmt <- emmPts %>%
     names_glue  = "{trial_pos}_{.value}"
   )
 
-emmPtsInLine <- emmPtsFmt %>%
+emmPtsRef <- emmPtsFmt %>%
   column_to_rownames("experiment")
 
-emmPtsMsTab <- emmPtsFmt %>%
+emmPtsTbl <- emmPtsFmt %>%
   transmute(
     experiment,
     nat_or_art,

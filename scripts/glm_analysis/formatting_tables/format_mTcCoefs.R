@@ -1,41 +1,44 @@
-# object created:
-# mTestTidyFmt, mTestTidyInLine, mTestTidyWideInLine, mTestCoefsMsTab,
-# testTrialSlopeInLine, testTrialSlopeMsTab
+# objects created:
+# mTcCoefsFmt, mTcCoefsRef, mTcCoefsTbl,
+# tcTrialSlopeRef, tcTrialSlopeTbl
 
-mTestTidyFmt <- mTestTidy %>%
+mTcCoefsFmt <- mTcCoefs %>%
   rename(logOdds = estimate) %>%
   mutate(
-    pFmt = pvalue(mTestTidy$p.value, accuracy = 0.001),
+    term           = if_else(term == "sd__(Intercept)", "Individual (SD)", term),
+    pFmt           = pvalue(p.value, accuracy = 0.001),
     oddsMultiplier = exp(logOdds)
   ) %>%
   fmtNumCols() %>%
   make_confint_col(prefix = "[", suffix = "]") %>%
-#  mutate(term = recode(term, !!!term_labels)) %>% not sure i want to recode the terms
   arrange(nat_or_art, experiment)
 
-mTestTidyInLine <- mTestTidyFmt
-
-mTestTidyWideInLine <- mTestTidyInLine %>%
-  select(term, logOdds, p.value, pFmt, confint, experiment) %>% # why am i keeping p.value here?
+mTcCoefsRef <- mTcCoefsFmt %>%
+  select(term, logOdds, p.value, pFmt, confint, experiment) %>%
   pivot_wider(
     names_from = "term",
     values_from = c("logOdds", "p.value", "pFmt", "confint"),
-    names_glue = "{term}_{.value}"
-  )
+    names_glue  = "{term}_{.value}"
+  ) %>%
+  tibble::column_to_rownames("experiment")
 
-mTestCoefsMsTab <- mTestTidyFmt %>% 
+mTcCoefsTbl <- mTcCoefsFmt %>%
   transmute(
     experiment, nat_or_art, term,
     logOdds95CI = sprintf("%s %s", logOdds, confint),
     pFmt
+  ) %>%
+  mutate(
+    logOdds95CI = if_else(term == "Individual (SD)", logOdds, logOdds95CI),
+    pFmt        = if_else(term == "Individual (SD)", "\u2014", pFmt)
   )
 
-testTrialSlopeInLine <- mTestTidyFmt %>%
+tcTrialSlopeRef <- mTcCoefsFmt %>%
   filter(term == "rank_trial") %>%
   select(experiment, nat_or_art, logOdds, confint, pFmt, oddsMultiplier) %>%
   tibble::column_to_rownames("experiment")
 
-testTrialSlopeMsTab <- testTrialSlopeInLine %>%
+tcTrialSlopeTbl <- tcTrialSlopeRef %>%
   tibble::rownames_to_column("experiment") %>%
   transmute(
     experiment, nat_or_art,

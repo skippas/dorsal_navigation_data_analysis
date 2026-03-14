@@ -20,25 +20,25 @@ sourceFmt <- function(file) source(file.path(formattingTablesDir, file))
 
 # -----------------------------------------------------------------------------
 # Format combined emmeans predictions
-# Produces: emmPtsInLine, emmPtsMsTab (top-level, shared across testRes/tcRes)
+# Produces: emmPtsRef, emmPtsTbl (top-level, shared across testRes/tcRes)
 # -----------------------------------------------------------------------------
 
-sourceFmt("format_emmPts.R")     # -> emmPtsInLine, emmPtsMsTab
+sourceFmt("format_emmPts.R")     # -> emmPtsRef, emmPtsTbl
 
 # -----------------------------------------------------------------------------
 # Format test-phase model results
 # Produces: testRes
 # -----------------------------------------------------------------------------
 
-sourceFmt("format_mTestTidy.R")  # -> mTestTidyWideInLine, mTestCoefsMsTab,
-                                 #    testTrialSlopeInLine, testTrialSlopeMsTab
+sourceFmt("format_mTestCoefs.R") # -> mTestCoefsRef, mTestCoefsTbl,
+                                 #    testTrialSlopeRef, testTrialSlopeTbl
 
 testRes <- list(
-  mCoefs           = mTestTidy,
-  mCoefsInLine     = mTestTidyWideInLine,
-  mCoefsMsTab      = mTestCoefsMsTab,
-  trialSlopeInLine = testTrialSlopeInLine,
-  trialSlopeMsTab  = testTrialSlopeMsTab
+  mCoefs           = mTestCoefs,
+  mCoefsRef     = mTestCoefsRef,
+  mCoefsTbl      = mTestCoefsTbl,
+  trialSlopeRef = testTrialSlopeRef,
+  trialSlopeTbl  = testTrialSlopeTbl
 )
 
 # -----------------------------------------------------------------------------
@@ -46,17 +46,17 @@ testRes <- list(
 # Produces: tcRes
 # -----------------------------------------------------------------------------
 
-sourceFmt("format_contTcLn.R")   # -> contTcLnInLine, contTcLnMsTab
-sourceFmt("format_mTcTidy.R")    # -> mTcTidyWideInLine, mTcCoefsMsTab,
-                                 #    tcTrialSlopeInLine, tcTrialSlopeMsTab
+sourceFmt("format_contTcLn.R")   # -> contTcLnRef, contTcLnTbl
+sourceFmt("format_mTcCoefs.R")   # -> mTcCoefsRef, mTcCoefsTbl,
+                                 #    tcTrialSlopeRef, tcTrialSlopeTbl
 
 tcRes <- list(
-  mCoefsInLine     = mTcTidyWideInLine,
-  mCoefsMsTab      = mTcCoefsMsTab,
-  contrastsInLine  = contTcLnInLine,
-  contrastsMsTab   = contTcLnMsTab,
-  trialSlopeInLine = tcTrialSlopeInLine,
-  trialSlopeMsTab  = tcTrialSlopeMsTab
+  mCoefsRef     = mTcCoefsRef,
+  mCoefsTbl      = mTcCoefsTbl,
+  contrastsRef  = contTcLnRef,
+  contrastsTbl   = contTcLnTbl,
+  trialSlopeRef = tcTrialSlopeRef,
+  trialSlopeTbl  = tcTrialSlopeTbl
 )
 
 # -----------------------------------------------------------------------------
@@ -66,8 +66,8 @@ tcRes <- list(
 save(
   emmAll,
   emmPts,
-  emmPtsInLine,
-  emmPtsMsTab,
+  emmPtsRef,
+  emmPtsTbl,
   testRes,
   tcRes,
   choices_rolling,

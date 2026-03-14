@@ -42,7 +42,7 @@ choices$manipulation <- relevel(choices$manipulation, ref = "test")
 # -----------------------------------------------------------------------------
 # Test-phase models (mTest)
 # Fit one model per experiment using test-phase data only.
-# Produces: mTest, mTestTidy, emmTestAll, emmTestPts
+# Produces: mTest, mTestCoefs, emmTestAll, emmTestPts
 # -----------------------------------------------------------------------------
 
 mTest <- choices %>%
@@ -54,7 +54,7 @@ mTest <- choices %>%
     data = .x, family = binomial
   ))
 
-mTestTidy <- map_df(mTest, broom.mixed::tidy, conf.int = TRUE, .id = "experiment") %>%
+mTestCoefs <- map_df(mTest, broom.mixed::tidy, conf.int = TRUE, .id = "experiment") %>%
   left_join(
     unique(choices[, c("experiment", "nat_or_art")]),
     by = "experiment"
@@ -86,7 +86,7 @@ emmTestPts <- emmTestAll %>%
 # -----------------------------------------------------------------------------
 # Test-control models (mTc)
 # Fit one model per experiment that has both test and control phases.
-# Produces: mTc, mTcTidy, emmTcAll, emmTcPts, contTcLn, contTcRsp
+# Produces: mTc, mTcCoefs, emmTcAll, emmTcPts, contTcLn, contTcRsp
 # -----------------------------------------------------------------------------
 
 mTc <- choices %>%
@@ -98,7 +98,7 @@ mTc <- choices %>%
     data = .x, family = binomial
   ))
 
-mTcTidy <- map_df(mTc, broom.mixed::tidy, conf.int = TRUE, .id = "experiment") %>%
+mTcCoefs <- map_df(mTc, broom.mixed::tidy, conf.int = TRUE, .id = "experiment") %>%
   left_join(
     unique(choices[, c("experiment", "nat_or_art")]),
     by = "experiment"
@@ -223,8 +223,8 @@ choices_rolling <- choices %>%
 save(
   choices,
   choices_rolling,
-  mTest, mTestTidy,
-  mTc, mTcTidy, contTcLn, contTcRsp,
+  mTest, mTestCoefs,
+  mTc, mTcCoefs, contTcLn, contTcRsp,
   emmAll, emmPts,
   plotStyle,
   file = "scripts/glm_analysis/analysis_results.RData"

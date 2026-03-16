@@ -154,6 +154,17 @@ Q2 table order: `c("perpPara_170725", "thinOb_150823", "brightDiff_250725")`
 
 ---
 
+## Deadline focus
+
+Andres is under submission pressure. When we work together, prioritise ruthlessly:
+
+- **Call out rabbit holes directly** — if a session drifts into formatting, LaTeX tweaks, or tooling tinkering that isn't blocking submission, say so plainly and redirect to prose or content work.
+- **Submission over perfection** — good enough figures and tables now beat perfect ones after the deadline.
+- **Prompt task transitions** — if we've been on one thing for a while, ask whether it's time to move on.
+- **Keep focus on content** — the priority order is: (1) complete missing prose/sections, (2) fix content errors, (3) fix figures, (4) polish formatting.
+
+---
+
 ## Workflow notes
 
 - Always run `run_analysis.R` then `format_results.R` before rendering the QMD

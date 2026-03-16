@@ -1,7 +1,14 @@
 ---
 title: "glm_analysis"
 format:
-  pdf: default
+  pdf:
+    keep-tex: true
+    pdf-engine: pdflatex
+    include-in-header:
+      text: |
+        \usepackage{pdflscape}
+        \usepackage{caption}
+        \captionsetup{format=plain, labelsep=period, justification=justified, singlelinecheck=false}
   latex:
     fig-format: pdf
   docx:
@@ -9,9 +16,6 @@ format:
     reference-doc: reference.docx
 execute:
   dir: project
-header-includes:
-  - \usepackage{caption}
-  - \captionsetup{format=plain, labelsep=period, justification=justified, singlelinecheck=false}
 editor:
   markdown:
     wrap: 72
@@ -270,12 +274,7 @@ suppNatModelGroups <- suppNatModelData %>%
   )
 
 suppModelTable <- suppModelData %>%
-  select(term, logOdds95CI, pFmt) %>%
-  rename(
-    `Term`              = term,
-    `Log-odds [95% CI]` = logOdds95CI,
-    `P`                 = pFmt
-  )
+  select(term, logOdds95CI, pFmt)
 ```
 
 To answer whether wasps require optic flow information to discriminate
@@ -319,21 +318,13 @@ the 50% line, they are significantly different (for example, comparing
 performance at an intermediate trial or comparing the average
 performance of the last five trials to the 50% line).
 
-```{r tbl-q2-art-contrast}
-#| tbl-cap: "Artificial test-control contrasts (test end vs control start)."
-knitr::kable(
-  q2ArtTcContrastTable,
-  booktabs = TRUE
-)
-```
-
 # Question 3: Can wasps use naturalistic patterns for navigation?
 
 Evidence for whether wasps can discriminate naturalistic canopies at
 above-chance rates (\>50%) is mixed. In four of the seven naturalistic
 canopy pairs we tested, the predicted $P_{\mathrm{corr}}$ by the end of
 the experiment was significantly above chance (the lower limit of the
-95% CI is \>50%, see @tbl-q3-nat-tc-pts), suggesting wasps may be
+95% CI is \>50%; see supplementary), suggesting wasps may be
 able to separate certain pairs of naturalistic canopies, although the performance is generally lower than for artificial stimuli (see below).
 
 ```{r fig-q3-tc}
@@ -406,27 +397,6 @@ q3NatTcContrastTable <- tcRes$contrastsTbl %>%
   )
 ```
 
-```{r tbl-q3-nat-tc-pts}
-#| tbl-cap: "Naturalistic test-control performance at test end and control start."
-knitr::kable(
-  q3NatPtsTable,
-  booktabs = TRUE
-)
-```
-
-Of the four naturalistic canopies that show $P_{\mathrm{corr}}$ \> 50%, after three of those we also ran a control (patterns removed) directly after the test phase concluded, but in only one case (Canopy D) was the $P_{\mathrm{corr}}$ at the end of the test significantly higher than at the start of the control. This can be attributed to the fact that $P_{\mathrm{corr}}$ for the naturalistic
-canopies is generally not much greater than 50% (if at all), and the
-fact that control experiments were not run for many trials, increasing
-the uncertainty around the $P_{\mathrm{corr}}$ during the control phase.
-
-```{r tbl-q3-nat-tc-contrast}
-#| tbl-cap: "Naturalistic test-control contrasts (test end vs control start)."
-knitr::kable(
-  q3NatTcContrastTable,
-  booktabs = TRUE
-)
-```
-
 Of the four naturalistic canopies that show $P_{\mathrm{corr}}$ \> 50%, after three of those we also ran a control (patterns removed) directly after the test phase concluded, but in only one case (Canopy D) was the $P_{\mathrm{corr}}$ at the end of the test significantly higher than at the start of the control. This can be attributed to the fact that $P_{\mathrm{corr}}$ for the naturalistic
 canopies is generally not much greater than 50% (if at all), and the
 fact that control experiments were not run for many trials, increasing
@@ -470,18 +440,6 @@ q3ArtWorst <- q3NatArtEndPts %>%
 ptJitter   <- position_jitter(width = 0.08, height = 0, seed = 3)
 canopyCols <- c(naturalistic = "forestgreen", artificial = "black")
 
-ggplot(q3NatArtEndPts, aes(x = nat_or_art, y = prob)) +
-  geom_hline(yintercept = 0.5, linetype = "dashed") +
-  geom_boxplot(aes(color = nat_or_art), width = 0.2, outlier.shape = NA) +
-  geom_errorbar(
-    aes(ymin = asymp.LCL, ymax = asymp.UCL, color = nat_or_art),
-    width = 0.03, alpha = 0.3, position = ptJitter
-  ) +
-  geom_point(aes(color = nat_or_art), size = 2, alpha = 0.1, position = ptJitter) +
-  scale_color_manual(values = canopyCols, guide = "none") +
-  scale_y_continuous(limits = c(0, 1)) +
-  labs(x = "Canopy type", y = "Predicted P(correct) at end of test") +
-  theme_bw()
 ```
 
 *Performance differences among naturalistic and artificial stimuli*
@@ -501,6 +459,66 @@ naturalistic experiments included here (n = 3 and 7 respectively) we did
 not test for an overall difference between naturalistic and artificial
 canopies.
 
+```{r fig-q3-combined}
+#| layout-ncol: 2
+#| fig-cap:
+#|   - "Test-phase predicted P(correct) for all experiments. Curves show the
+#|     full learning trajectory; points mark the prediction at the maximum
+#|     shared trial. Green = naturalistic, black = artificial."
+#|   - "Predicted P(correct) at the maximum shared trial, grouped by stimulus
+#|     type."
+
+# Per-experiment colour mapping: black for artificial, green for naturalistic
+allExpLabels <- c(artLabels, natcanLabels)
+expCols <- c(
+  setNames(rep("black",       length(artLabels)),    unname(artLabels)),
+  setNames(rep("forestgreen", length(natcanLabels)), unname(natcanLabels))
+)
+
+# Test-phase prediction curves for all experiments
+allExpTestAll <- emmAll %>%
+  filter(manipulation == "test") %>%
+  mutate(experiment = dplyr::recode(experiment, !!!allExpLabels))
+
+# Maximum shared trial: highest trial number reached by every experiment
+maxSharedTrial <- emmAll %>%
+  filter(manipulation == "test") %>%
+  group_by(experiment) %>%
+  summarise(max_trial = max(rank_trial), .groups = "drop") %>%
+  pull(max_trial) %>%
+  min()
+
+# Predicted point at the shared trial for each experiment
+emmSharedPt <- emmAll %>%
+  filter(manipulation == "test", rank_trial == maxSharedTrial) %>%
+  mutate(experiment = dplyr::recode(experiment, !!!allExpLabels))
+
+# Figure 4: overlaid learning curves
+ggplot(allExpTestAll,
+       aes(x = rank_trial, y = prob,
+           group = experiment, colour = experiment)) +
+  geom_ribbon(aes(ymin = asymp.LCL, ymax = asymp.UCL, fill = experiment),
+              colour = NA, alpha = 0.1) +
+  geom_line(alpha = 0.5) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  geom_point(data = emmSharedPt, size = 2, alpha = 0.5) +
+  scale_colour_manual(values = expCols, name = NULL) +
+  scale_fill_manual(values = expCols, guide = "none") +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  labs(x = "Trial", y = "P(correct)") +
+  theme_bw()
+
+# Figure 5: boxplot at the shared trial reference point
+ggplot(emmSharedPt, aes(x = nat_or_art, y = prob)) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  geom_boxplot(aes(color = nat_or_art), width = 0.2, outlier.shape = NA) +
+  geom_point(aes(color = nat_or_art), size = 2, alpha = 0.5) +
+  scale_color_manual(values = canopyCols, guide = "none") +
+  scale_y_continuous(limits = c(0, 1)) +
+  labs(x = "Canopy type", y = "Predicted P(correct) at shared trial") +
+  theme_bw()
+```
+
 # Supplementary
 
 ```{r supplementaryTbls}
@@ -518,34 +536,75 @@ roundNumsInString <- function(x, digits = 2) {
     character(1)
   )
 }
+```
 
-s1PtsTbl <- emmPtsTbl %>%
+<!-- TODO: investigate rotating the page number on the landscape page (not sure
+     if standard). One approach: \usepackage{everypage} + \tikz overlay in the
+     header; another is lscape + rotating package. -->
+
+```{=latex}
+\begin{landscape}
+```
+
+```{r tbl-s-overview}
+#| tbl-cap: "Predicted $P_{\\mathrm{corr}}$ at key trial positions and test--control contrasts for all experiments. Rows with a significant test-end vs control-start contrast ($p < 0.05$) are bolded. Control start and contrast columns are blank for test-only experiments."
+#| eval: !expr knitr::pandoc_to() != "docx"
+
+expOrder <- c(q2ArtTableOrder, names(natcanLabels))
+
+allExpOverview <- emmPtsTbl %>%
   mutate(
     across(c(firstPcorr95CI, midPcorr95CI, lastTestPcorr95CI, ctrlStartPcorr95CI),
-           ~ roundNumsInString(.x, digits = 2)),
-    `last test trial` = lastTestTrial
+           ~ roundNumsInString(.x, digits = 2))
   ) %>%
-  select(-lastTestTrial)
+  left_join(
+    tcRes$contrastsTbl %>% select(experiment, logOddsRatio95CI, pFmt),
+    by = "experiment"
+  ) %>%
+  mutate(experiment = factor(experiment, levels = expOrder)) %>%
+  arrange(experiment) %>%
+  mutate(experiment = dplyr::recode(as.character(experiment), !!!c(artLabels, natcanLabels)))
 
-trialSlopeTbl <- bind_rows(testRes$trialSlopeTbl, tcRes$trialSlopeTbl)
+n_art    <- sum(allExpOverview$nat_or_art == "artificial")
+n_nat    <- sum(allExpOverview$nat_or_art == "naturalistic")
 
-allContrastsTbl <- bind_rows(q2ArtTcContrastTable, q3NatTcContrastTable)
+tbl <- allExpOverview %>%
+  select(experiment, firstPcorr95CI, midPcorr95CI, lastTestPcorr95CI,
+         ctrlStartPcorr95CI, logOddsRatio95CI, pFmt, lastTestTrial) %>%
+  knitr::kable(
+    col.names = c("Experiment", "Test start", "Test middle", "Test end",
+                  "Control start", "Log-odds ratio [95% CI]", "P", "Last trial"),
+    booktabs = TRUE, escape = FALSE
+  ) %>%
+  kableExtra::add_header_above(
+    c(" " = 1, "$P_{\\\\mathrm{corr}}$ [95\\\\% CI]" = 4, " " = 3),
+    escape = FALSE
+  ) %>%
+  kableExtra::pack_rows("Artificial", 1, n_art) %>%
+  kableExtra::pack_rows("Naturalistic", n_art + 1, n_art + n_nat) %>%
+  kableExtra::kable_styling(font_size = 9, latex_options = "hold_position")
 
-suppTbls <- list(
-  "Predictions at first, middle, last test, and control start" = s1PtsTbl,
-  "Test-control contrasts (test end vs control start)"         = allContrastsTbl,
-  "Trial slope summary"                                        = trialSlopeTbl
+# knitr::kable converts non-ASCII chars to <U+XXXX> sequences; fix them here
+# after all kableExtra processing (which would re-escape LaTeX backslashes)
+knitr::asis_output(
+  gsub("<U\\+00B0>", "$^{\\\\circ}$",
+  gsub("<U\\+00B1>", "$\\\\pm$",
+       paste(as.character(tbl), collapse = "\n")))
 )
+```
 
-purrr::iwalk(suppTbls, function(tbl, cap) {
-  print(knitr::kable(tbl, caption = cap, booktabs = TRUE))
-  cat("\n\n")
-})
+```{=latex}
+\end{landscape}
 ```
 
 ```{r tbl-s-model-coefs}
 #| tbl-cap: "Model coefficients for all stimulus experiments."
-k <- knitr::kable(suppModelTable, booktabs = TRUE)
+#| eval: !expr knitr::pandoc_to() != "docx"
+k <- knitr::kable(
+  suppModelTable,
+  col.names = c("Term", "Log-odds [95% CI]", "P"),
+  booktabs = TRUE, escape = FALSE
+)
 allGroups <- bind_rows(suppArtModelGroups, suppNatModelGroups)
 for (i in seq_len(nrow(allGroups))) {
   k <- kableExtra::pack_rows(k,

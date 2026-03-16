@@ -113,13 +113,13 @@ p
 
 During the test phase, trial number had a significant positive effect on
 $P_{\mathrm{corr}}$ (@fig-q1, solid line; p`r mCoefsRefQ1$rank_trial_pFmt`),
-with $P_{\mathrm{corr}}$ rising from `r emmPtsRefQ1$first_prob` (95% CI
-`r emmPtsRefQ1$first_confint`) at trial 1 to `r emmPtsRefQ1$last_test_prob`
+with $P_{\mathrm{corr}}$ rising from `r emmPtsRefQ1$first_prob`% (95% CI
+`r emmPtsRefQ1$first_confint`) at trial 1 to `r emmPtsRefQ1$last_test_prob`%
 (95% CI `r emmPtsRefQ1$last_test_confint`) by test end.
 
 End-of-test $P_{\mathrm{corr}}$ was significantly above chance (lower 95% CI
 bound \>50%; @fig-q1 test panel), and significantly above performance at the
-start of the control phase (`r emmPtsRefQ1$ctrl_start_prob`, 95% CI
+start of the control phase (`r emmPtsRefQ1$ctrl_start_prob`%, 95% CI
 `r emmPtsRefQ1$ctrl_start_confint`; p`r contrastsRefQ1$pFmt`; @fig-q1).
 
 Also note that $P_{\mathrm{corr}}$ is significantly above chance (grey
@@ -292,12 +292,12 @@ presumably produce identical rates of optic flow in the dorsal visual
 field (@fig-q2). Similar to the perpendicular-parallel experiment, trial
 had a significant positive effect on $P_{\mathrm{corr}}$
 (p`r q2TrialSlopeTable["thinOb_150823", "pFmt"]`; @tbl-s-model-coefs),
-with performance rising from `r emmArt["thinOb_150823", "first_prob"]`
+with performance rising from `r emmArt["thinOb_150823", "first_prob"]`%
 (95% CI `r emmArt["thinOb_150823", "first_confint"]`) at trial 1 to
-`r emmArt["thinOb_150823", "last_test_prob"]` (95% CI
+`r emmArt["thinOb_150823", "last_test_prob"]`% (95% CI
 `r emmArt["thinOb_150823", "last_test_confint"]`) by test end —
 significantly above chance (50%). $P_{\mathrm{corr}}$ at test end was also significantly above performance
-at the start of the control phase (`r emmPtsRef["thinOb_150823", "ctrl_start_prob"]`,
+at the start of the control phase (`r emmPtsRef["thinOb_150823", "ctrl_start_prob"]`%,
 95% CI `r emmPtsRef["thinOb_150823", "ctrl_start_confint"]`;
 p`r tcRes$contrastsRef["thinOb_150823","pFmt"]`).
 
@@ -306,9 +306,9 @@ transparent roof, ie. between stimuli that carried little to no pattern
 information. Trial had a positive but non-significant effect on $P_{\mathrm{corr}}$
 (p`r q2TrialSlopeTable["brightDiff_250725", "pFmt"]`; @tbl-s-model-coefs),
 likely due to the shorter number of trials run in this experiment, and
-performance rose from `r emmArt["brightDiff_250725", "first_prob"]`
+performance rose from `r emmArt["brightDiff_250725", "first_prob"]`%
 (95% CI `r emmArt["brightDiff_250725", "first_confint"]`) at trial 1 to
-`r emmArt["brightDiff_250725", "last_test_prob"]`
+`r emmArt["brightDiff_250725", "last_test_prob"]`%
 (95% CI `r emmArt["brightDiff_250725", "last_test_confint"]`) by test end. Performance at
 the end of the experiment is only borderline significantly higher than
 50% because of the increased uncertainty in the slope / effect of trials
@@ -425,17 +425,19 @@ natArtMean <- q3NatArtEndPts %>%
     names_glue  = "{nat_or_art}_{.value}"
   ) %>%
   mutate(diff_mean_prob = artificial_mean_prob - naturalistic_mean_prob) %>%
-  fmtNumCols()
+  mutate(across(ends_with("_prob"), ~as.character(as.integer(round(. * 100)))))
 
 q3NatBest  <- q3NatArtEndPts %>%
   filter(nat_or_art == "naturalistic") %>%
   slice_max(order_by = prob, n = 1, with_ties = FALSE) %>%
-  fmtNumCols()
+  mutate(prob  = as.character(as.integer(round(prob * 100))),
+         label = unname(natcanLabels[experiment]))
 
 q3ArtWorst <- q3NatArtEndPts %>%
   filter(nat_or_art == "artificial") %>%
   slice_min(order_by = prob, n = 1, with_ties = FALSE) %>%
-  fmtNumCols()
+  mutate(prob  = as.character(as.integer(round(prob * 100))),
+         label = unname(artLabels[experiment]))
 
 ptJitter   <- position_jitter(width = 0.08, height = 0, seed = 3)
 canopyCols <- c(naturalistic = "forestgreen", artificial = "black")
@@ -446,27 +448,24 @@ canopyCols <- c(naturalistic = "forestgreen", artificial = "black")
 
 Discrimination performance for naturalistic canopies tends
 to be lower than for artificial canopies. The naturalistic canopy
-showing the best performance (`r q3NatBest$experiment`,
-$P_{\mathrm{corr}}$ = `r q3NatBest$prob`) still has a lower
+showing the best performance (`r q3NatBest$label`,
+$P_{\mathrm{corr}}$ = `r q3NatBest$prob`%) still has a lower
 $P_{\mathrm{corr}}$ than the artificial canopy with the worst
-performance (`r q3ArtWorst$experiment`, $P_{\mathrm{corr}}$ =
-`r q3ArtWorst$prob`). The average performance for all naturalistic
-canopies is `r natArtMean$naturalistic_mean_prob`, whereas for
-artificial it is `r natArtMean$artificial_mean_prob`, and the difference
+performance (`r q3ArtWorst$label`, $P_{\mathrm{corr}}$ =
+`r q3ArtWorst$prob`%). The average performance for all naturalistic
+canopies is `r natArtMean$naturalistic_mean_prob`%, whereas for
+artificial it is `r natArtMean$artificial_mean_prob`%, and the difference
 in the average $P_{\mathrm{corr}}$ for naturalistic and artificial is
-`r natArtMean$diff_mean_prob`. Given the low number of artificial and
+`r natArtMean$diff_mean_prob`%. Given the low number of artificial and
 naturalistic experiments included here (n = 3 and 7 respectively) we did
 not test for an overall difference between naturalistic and artificial
 canopies.
 
 ```{r fig-q3-combined}
-#| layout-ncol: 2
-#| fig-cap:
-#|   - "Test-phase predicted P(correct) for all experiments. Curves show the
-#|     full learning trajectory; points mark the prediction at the maximum
-#|     shared trial. Green = naturalistic, black = artificial."
-#|   - "Predicted P(correct) at the maximum shared trial, grouped by stimulus
-#|     type."
+#| fig-cap: "Predicted P(correct) at the maximum shared trial, grouped by
+#|   stimulus type. Points show individual experiments."
+
+library(patchwork)
 
 # Per-experiment colour mapping: black for artificial, green for naturalistic
 allExpLabels <- c(artLabels, natcanLabels)
@@ -493,10 +492,10 @@ emmSharedPt <- emmAll %>%
   filter(manipulation == "test", rank_trial == maxSharedTrial) %>%
   mutate(experiment = dplyr::recode(experiment, !!!allExpLabels))
 
-# Figure 4: overlaid learning curves
-ggplot(allExpTestAll,
-       aes(x = rank_trial, y = prob,
-           group = experiment, colour = experiment)) +
+# Panel A: overlaid learning curves
+pA <- ggplot(allExpTestAll,
+             aes(x = rank_trial, y = prob,
+                 group = experiment, colour = experiment)) +
   geom_ribbon(aes(ymin = asymp.LCL, ymax = asymp.UCL, fill = experiment),
               colour = NA, alpha = 0.1) +
   geom_line(alpha = 0.5) +
@@ -504,19 +503,22 @@ ggplot(allExpTestAll,
   geom_point(data = emmSharedPt, size = 2, alpha = 0.5) +
   scale_colour_manual(values = expCols, name = NULL) +
   scale_fill_manual(values = expCols, guide = "none") +
-  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  scale_y_continuous(labels = scales::percent, limits = c(0.25, 1)) +
   labs(x = "Trial", y = "P(correct)") +
   theme_bw()
 
-# Figure 5: boxplot at the shared trial reference point
-ggplot(emmSharedPt, aes(x = nat_or_art, y = prob)) +
+# Panel B: jittered points at the shared trial reference point
+pB <- ggplot(emmSharedPt, aes(x = nat_or_art, y = prob)) +
   geom_hline(yintercept = 0.5, linetype = "dashed") +
-  geom_boxplot(aes(color = nat_or_art), width = 0.2, outlier.shape = NA) +
-  geom_point(aes(color = nat_or_art), size = 2, alpha = 0.5) +
+  geom_point(aes(color = nat_or_art), size = 2, alpha = 0.7,
+             position = position_jitter(width = 0.08, height = 0, seed = 3)) +
   scale_color_manual(values = canopyCols, guide = "none") +
-  scale_y_continuous(limits = c(0, 1)) +
+  scale_y_continuous(labels = scales::percent, limits = c(0.25, 1)) +
   labs(x = "Canopy type", y = "Predicted P(correct) at shared trial") +
-  theme_bw()
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+pA + pB + plot_layout(widths = c(2, 1))
 ```
 
 # Supplementary

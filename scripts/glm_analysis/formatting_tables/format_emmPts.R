@@ -6,13 +6,17 @@
 # ctrl_start_* columns are NA for experiments without a control phase.
 
 emmPtsFmt <- emmPts %>%
-  fmtNumCols() %>%
+  mutate(
+    prob      = as.character(as.integer(round(prob      * 100))),
+    asymp.LCL = as.character(as.integer(round(asymp.LCL * 100))),
+    asymp.UCL = as.character(as.integer(round(asymp.UCL * 100)))
+  ) %>%
   make_confint_col(
     lower_col = "asymp.LCL",
     upper_col = "asymp.UCL",
     out_col   = "confint",
     prefix    = "[",
-    suffix    = "]"
+    suffix    = "]%"
   ) %>%
   select(experiment, nat_or_art, rank_trial, prob, confint, trial_pos) %>%
   pivot_wider(

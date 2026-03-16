@@ -24,14 +24,15 @@ mTcCoefsRef <- mTcCoefsFmt %>%
 
 mTcCoefsTbl <- mTcCoefsFmt %>%
   transmute(
-    experiment, nat_or_art, term,
+    experiment, nat_or_art, term, logOdds,
     logOdds95CI = sprintf("%s %s", logOdds, confint),
     pFmt
   ) %>%
   mutate(
     logOdds95CI = if_else(term == "Individual (SD)", logOdds, logOdds95CI),
     pFmt        = if_else(term == "Individual (SD)", "\u2014", pFmt)
-  )
+  ) %>%
+  select(-logOdds)
 
 tcTrialSlopeRef <- mTcCoefsFmt %>%
   filter(term == "rank_trial") %>%

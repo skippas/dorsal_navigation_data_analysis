@@ -45,6 +45,7 @@ if (knitr::pandoc_to("docx")) {
 # To regenerate: run run_analysis.R then format_results.R from the project root.
 library(tidyverse)
 library(scales)
+library(ggtext)
 source("functions/format_numeric_cols.R")
 
 load("scripts/glm_analysis/formatted_results.RData")
@@ -64,6 +65,18 @@ natcanLabels <- c(
   natcan4_180825 = "Canopy G",
   natcan5_290825 = "Canopy H",
   natcan6_070925 = "Canopy I"
+)
+
+# HTML image labels for ggtext strip rendering
+stimPngDir <- "scripts/glm_analysis/stimuli_pngs"
+natcanImgLabels <- c(
+  "Canopy D"  = paste0("<img src='", stimPngDir, "/canopyD.png' width='50'/>"),
+  "Canopy E"  = paste0("<img src='", stimPngDir, "/canopyE.png' width='50'/>"),
+  "Canopy F1" = paste0("<img src='", stimPngDir, "/canopyF.png' width='50'/>"),
+  "Canopy F2" = paste0("<img src='", stimPngDir, "/canopyF.png' width='50'/>"),
+  "Canopy G"  = paste0("<img src='", stimPngDir, "/canopyG.png' width='50'/>"),
+  "Canopy H"  = paste0("<img src='", stimPngDir, "/canopyH.png' width='50'/>"),
+  "Canopy I"  = paste0("<img src='", stimPngDir, "/canopyI.png' width='50'/>")
 )
 ```
 
@@ -353,11 +366,17 @@ p <- ggplot(emmNatTcAll, aes(x = rank_trial, y = prob)) +
   ) +
   ylim(0, 1) +
   geom_hline(yintercept = 0.5, linetype = "dashed") +
-  facet_grid(experiment ~ manipulation, scales = "free_x") +
+  facet_grid(experiment ~ manipulation, scales = "free_x",
+             switch = "y",
+             labeller = labeller(experiment = as_labeller(natcanImgLabels))) +
   ylab("P(correct)") +
   theme_bw() +
   theme(legend.position = "none", panel.spacing.y = unit(0.75, "lines"),
-        panel.spacing.x = unit(0, "lines"))
+        panel.spacing.x = unit(0, "lines"),
+        strip.text.y.left = ggtext::element_textbox_simple(
+          hjust = 0.5, valign = 0.5,
+          padding = margin(2, 2, 2, 2)
+        ))
 
 p <- p + geom_point(data = choicesRollTc, aes(x = rank_trial, y = pcorr),
                     colour = "black", alpha = 0.1)

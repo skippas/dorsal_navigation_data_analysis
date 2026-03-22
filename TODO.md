@@ -29,6 +29,7 @@
 - [ ] Slope results are intertwined with the end-of-test prediction narrative — decide whether to separate them or keep together, but either way be consistent with how slopes are reported across all questions in the results
 
 ## Q3
+- [ ] Make panel labels in Figure 6 same as those in other figures using Affinity
 - [x] Replace figure 3 with a single plot with empty panels where controls were not run
 - [x] Free up space on x-axis in figure 4
 - [ ] Run an overall test comparing naturalistic and artificial canopies (including all data)

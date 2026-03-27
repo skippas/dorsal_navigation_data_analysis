@@ -15,49 +15,65 @@ source("functions/format_numeric_cols.R")
 source("functions/make_confint_col.R")
 source("functions/format_tables.R")
 
-formattingTablesDir <- "scripts/glm_analysis/formatting_tables"
-sourceFmt <- function(file) source(file.path(formattingTablesDir, file))
-
 # -----------------------------------------------------------------------------
 # Format combined emmeans predictions
-# Produces: emmPtsRef, emmPtsTbl (top-level, shared across testRes/tcRes)
+# Produces: emmPtsRef, emmPtsTbl
 # -----------------------------------------------------------------------------
 
-sourceFmt("format_emmPts.R")     # -> emmPtsRef, emmPtsTbl
+source("scripts/glm_analysis/formatting_tables/format_emmPts.R")     # -> emmPtsRef, emmPtsTbl
 
 # -----------------------------------------------------------------------------
-# Format test-phase model results
-# Produces: testRes
+# Format model coefficients (test-only and test-control combined)
+# Produces: mAllCoefsFmt, mAllCoefsRef, mAllCoefsTbl,
+#           allTrialSlopeRef, allTrialSlopeTbl
 # -----------------------------------------------------------------------------
 
-sourceFmt("format_mTestCoefs.R") # -> mTestCoefsRef, mTestCoefsTbl,
-                                 #    testTrialSlopeRef, testTrialSlopeTbl
+mAllCoefs <- bind_rows(mTestCoefs, mTcCoefs)
+source("scripts/glm_analysis/formatting_tables/format_mAllCoefs.R")
 
-testRes <- list(
-  mCoefs           = mTestCoefs,
-  mCoefsRef     = mTestCoefsRef,
-  mCoefsTbl      = mTestCoefsTbl,
-  trialSlopeRef = testTrialSlopeRef,
-  trialSlopeTbl  = testTrialSlopeTbl
+# -----------------------------------------------------------------------------
+# Format test-control contrasts
+# Produces: contrastRes (contrasts only)
+# -----------------------------------------------------------------------------
+
+source("scripts/glm_analysis/formatting_tables/format_contTcLn.R")   # -> contTcLnRef, contTcLnTbl
+
+contrastRes <- list(
+  contrastsRef = contTcLnRef,
+  contrastsTbl = contTcLnTbl
 )
 
 # -----------------------------------------------------------------------------
-# Format test-control model results
-# Produces: tcRes
+# Sample size summaries
+# Produces: nLabels (figure annotations), nSummary (Table S1 columns)
 # -----------------------------------------------------------------------------
 
-sourceFmt("format_contTcLn.R")   # -> contTcLnRef, contTcLnTbl
-sourceFmt("format_mTcCoefs.R")   # -> mTcCoefsRef, mTcCoefsTbl,
-                                 #    tcTrialSlopeRef, tcTrialSlopeTbl
+nLabels <- choices %>%
+  group_by(experiment, manipulation) %>%
+  summarise(
+    n_wasps   = n_distinct(individual),
+    n_choices = n(),
+    label     = paste0("n = ", n_wasps, " wasps, ", n_choices, " choices"),
+    .groups = "drop"
+  )
 
-tcRes <- list(
-  mCoefsRef     = mTcCoefsRef,
-  mCoefsTbl      = mTcCoefsTbl,
-  contrastsRef  = contTcLnRef,
-  contrastsTbl   = contTcLnTbl,
-  trialSlopeRef = tcTrialSlopeRef,
-  trialSlopeTbl  = tcTrialSlopeTbl
-)
+nSummary <- choices %>%
+  group_by(experiment, manipulation) %>%
+  summarise(
+    n_wasps   = n_distinct(individual),
+    n_choices = n(),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from  = manipulation,
+    values_from = c(n_wasps, n_choices),
+    names_glue  = "{.value}_{manipulation}"
+  ) %>%
+  mutate(
+    across(c(n_wasps_control, n_choices_control),
+           ~ if_else(is.na(.), "---", as.character(.))),
+    across(c(n_wasps_test, n_choices_test), as.character)
+  )
 
 # -----------------------------------------------------------------------------
 # Save
@@ -68,9 +84,17 @@ save(
   emmPts,
   emmPtsRef,
   emmPtsTbl,
-  testRes,
-  tcRes,
+  mAllCoefsFmt,
+  mAllCoefsRef,
+  mAllCoefsTbl,
+  allTrialSlopeRef,
+  allTrialSlopeTbl,
+  contrastRes,
+  q2ArtTableOrder,
+  q2ArtTcContrastTable,
   choices_rolling,
+  nLabels,
+  nSummary,
   plotStyle,
   file = "scripts/glm_analysis/formatted_results.RData"
 )

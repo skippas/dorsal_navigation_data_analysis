@@ -220,7 +220,13 @@ For the thick oblique experiment (Figure 2C), trial had a positive but non-signi
 $P_{\mathrm{corr}}$ (p = `r q2TrialSlopeTable["thickOb_140823", "pFmt"]`; @tbl-model-coefs),
 with performance rising from `r emmPtsRef["thickOb_140823", "first_prob"]`%
 to `r emmPtsRef["thickOb_140823", "last_test_prob"]`% by test end ---
-also significantly above chance. 
+also significantly above chance.
+
+Performance also differed between stimulus types: wasps discriminated the
+perpendicular/parallel stimulus pair significantly better than the average of
+the two oblique pairs (odds ratio `r artCompareRef$oddsRatio`,
+95% CI `r artCompareRef$confint`, p = `r artCompareRef$pFmt`), indicating that
+discrimination is not equally easy for all artificial patterns tested.
 
 Next, we asked whether wasps could discriminate between an opaque and
 transparent ceiling, ie. between stimuli that carried little to no pattern
@@ -311,10 +317,7 @@ above-chance rates (\>50%) is mixed.
 In three of the six naturalistic canopy pairs we tested, the predicted $P_{\mathrm{corr}}$ by the end of the test was significantly (canopy E, G2) or borderline significantly (canopy I) above chance (the lower limit of the 95% CI is \>50%; @fig-q3-tc, @tbl-overview, @fig-supp-canopyG1), but for the other three canopy pairs this was not the case. 
 This suggests that wasps may be able to separate certain pairs of naturalistic canopies, although the performance is generally lower than for artificial stimuli (see below).
 
-For two of the three naturalistic canopies that show a $P_{\mathrm{corr}}$ significantly or near significantly greater than 50%, after two of those we also ran a control (patterns removed) directly
-after the test phase concluded, but in only one case (Canopy E) was the $P_{\mathrm{corr}}$ at the end of the test significantly higher than at the start of the control. 
-This can be attributed to the fact that $P_{\mathrm{corr}}$ for the naturalistic canopies is generally not much greater than 50% (if at all), and the fact that control experiments were
-not run for many trials, increasing the uncertainty around the $P_{\mathrm{corr}}$ at the start of the control phase.
+Three of the naturalistic canopies showed a $P_{\mathrm{corr}}$ significantly or near-significantly greater than 50%. For two of these, we also ran a control (patterns removed) immediately after the test phase concluded, but only for Canopy E was the $P_{\mathrm{corr}}$ at the end of the test significantly higher than at the start of the control. This is likely due to two factors: $P_{\mathrm{corr}}$ for naturalistic canopies is generally only modestly above 50% to begin with (if at all), and the control phases were run for relatively few trials, which increases the uncertainty in the estimated $P_{\mathrm{corr}}$ at the start of the control.
 
 # Performance differences among naturalistic and artificial stimuli
 
@@ -367,12 +370,12 @@ The naturalistic canopy showing the best performance (`r q3NatBest$label`, $P_{\
 artificial canopy with the worst performance (Transparent/Opaque,
 $P_{\mathrm{corr}}$ = `r q3ArtWorst$prob`%).
 The average performance for all naturalistic canopies is `r natArtMean$naturalistic_mean_prob`%,
-whereas for artificial stimuli it is `r natArtMean$artificial_mean_prob`%, and the difference in the average $P_{\mathrm{corr}}$ for naturalistic and artificial stimuli is `r natArtMean$diff_mean_prob`%. Given the low number of artificial and naturalistic experiments included here (n = 4 and 7 respectively) we did not test for an overall difference between naturalistic and artificial canopies.
+whereas for artificial stimuli it is `r natArtMean$artificial_mean_prob`%, and the difference in the average $P_{\mathrm{corr}}$ for naturalistic and artificial stimuli is `r natArtMean$diff_mean_prob`%. Given the low number of artificial and naturalistic experiments included here (4 artificial and 7 naturalistic canopy experiments), we did not test for an overall difference between naturalistic and artificial canopies.
 
 Additionally, the effects of trial on $P_{\mathrm{corr}}$ were modest for naturalistic stimuli in comparison to artificial stimuli (compare trial coefficients in @tbl-model-coefs) and were only significantly greater than zero for canopy G2. This translated to small performance increases between trial 1 and trial 26 for naturalistic stimuli relative to artificial stimuli (@tbl-overview).
 
 ```{r fig-q3-combined}
-#| fig-cap: "Probability of correct choices for naturalistic and artificial experiments at the maximum common test-phase trial across experiments. A. Probability of a correct choice across all experiments in the same plot (best fit lines) and 95% confidence intervals around those probailities (shaded ribbons). The points in A show the predicted probability of a correct choice at trial 26, the maximum test-phase trial that is common to all experiments. B. The performance at trial 26 compared between artificial and naturalistic experiments. Points in B are the same as those in A."
+#| fig-cap: "Probability of correct choices for naturalistic and artificial experiments at the maximum common test-phase trial across experiments. A. Probability of a correct choice across all experiments in the same plot (best fit lines) and 95% confidence intervals around those probabilities (shaded ribbons). The points in A show the predicted probability of a correct choice at trial 26, the maximum test-phase trial that is common to all experiments. B. The performance at trial 26 compared between artificial and naturalistic experiments. Points in B are the same as those in A."
 
 library(patchwork)
 
@@ -641,7 +644,7 @@ rm(k, allGroups)
 
 ```{r fig-supp-experiments}
 #| fig-height: 4
-#| fig-cap: "Wasp performance for two additional \"control\" experiments not included in the main analysis. A. In this experiment we first tested whether a group of wasps could discriminate a naturalistic pair of stimuli (left panel, same data as presented in @{fig-q3-tc} row 6). To rule out that performance differences between naturalistic and artificial stimuli might be driven by differences in wasp species, hives, individuals or phase of the season, we tested if the same group of wasps could discriminate the perpendicular-parallel artificial stimuli (right panel) immediately following a naturalistic canopy stimulus pair (left panel). Note that the same wasp individuals that could not discriminate the naturalistic stimuli can discriminate the artificial stimuli. B. To rule out the possibility that above-chance discrimination of dorsal stimuli might be explained by the use of reflections of the dorsal stimuli off surfaces of the Y-maze that are ventral or lateral to the wasps (i.e. the bottom and sides of the maze) we covered first the bottom (middle panel) and then the sides of the maze (right panel) with LEE Filter 1/4 white diffuser film (251). Note that performance remains well above chance after the addition of diffuser paper."
+#| fig-cap: "Wasp performance for two additional \"control\" experiments not included in the main analysis. A. To rule out the possibility that above-chance discrimination of dorsal stimuli might be explained by the use of reflections of the dorsal stimuli off surfaces of the Y-maze that are ventral or lateral to the wasps (i.e. the bottom and sides of the maze) we tested whether wasps could discriminate the thick oblique artificial stimuli after covering first the bottom (middle panel) and then the sides of the maze (right panel) with LEE Filter 1/4 white diffuser film (251). Note that performance remains well above chance after the addition of the diffuser. B. In this experiment we first tested whether a group of wasps could discriminate a naturalistic pair of stimuli (left panel, same data as presented in @{fig-q3-tc} row 6). To rule out that performance differences between naturalistic and artificial stimuli might be driven by differences in wasp species, hives, individuals or phase of the season, we tested if the same group of wasps could discriminate the perpendicular-parallel artificial stimuli (right panel) immediately following a naturalistic canopy stimulus pair (left panel). Note that the same wasp individuals that could not discriminate the naturalistic stimuli can discriminate the artificial stimuli."
 #| 
 #| 
 #| eval: !expr knitr::pandoc_to() != "docx"

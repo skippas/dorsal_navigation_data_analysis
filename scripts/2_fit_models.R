@@ -104,43 +104,51 @@ mTcCoefs <- map_df(mTc, broom.mixed::tidy, conf.int = TRUE, .id = "experiment") 
     by = "experiment"
   )
 
-emmPredCont <- map2(
-  .x = mTc, .y = names(mTc),
-  function(m, exp_id) {
-    obs     <- model.frame(m) %>% distinct(manipulation, rank_trial)
-    testEnd  <- max(obs[obs$manipulation == "test", ]$rank_trial)
-    ctrlStart <- 1
+# For one test-control experiment's fitted model, produces:
+#   - emmAll:    predicted P_corr across every trial x phase combination that
+#                actually occurs in the data (the plotted learning curve)
+#   - contLink:  test-end vs. control-start contrast, log-odds-ratio scale
+#                (for the p-value/CI)
+#   - contResp:  the same contrast, back-transformed to an odds ratio
+#                (for reporting)
+compute_tc_contrast <- function(model, experiment_id) {
+  obs       <- model.frame(model) %>% distinct(manipulation, rank_trial)
+  testEnd   <- max(obs[obs$manipulation == "test", ]$rank_trial)
+  ctrlStart <- 1
 
-    emmAll <- emmeans(m, ~ rank_trial * manipulation,
-                      cov.keep = "rank_trial",
-                      type = "response") %>%
-      as.data.frame() %>%
-      semi_join(obs, by = c("manipulation", "rank_trial")) %>%
-      mutate(experiment = exp_id)
+  emmAll <- emmeans(model, ~ rank_trial * manipulation,
+                    cov.keep = "rank_trial",
+                    type = "response") %>%
+    as.data.frame() %>%
+    semi_join(obs, by = c("manipulation", "rank_trial")) %>%
+    mutate(experiment = experiment_id)
 
-    emmCont <- emmeans(m, ~ manipulation * rank_trial,
-                       at = list(rank_trial = c(ctrlStart, testEnd)))
-    emmCont <- subset(
-      emmCont,
-      (manipulation == "control" & rank_trial == ctrlStart) |
-      (manipulation == "test"    & rank_trial == testEnd)
-    )
-    grid <- emmCont@grid
-    ord  <- order(grid$manipulation == "test", grid$rank_trial)
-    emmCont <- emmCont[ord]
+  emmCont <- emmeans(model, ~ manipulation * rank_trial,
+                     at = list(rank_trial = c(ctrlStart, testEnd)))
 
-    cont <- contrast(emmCont, list("test_end - control_start" = c(-1, 1)))
+  # Build the contrast weights by matching each grid row's actual
+  # manipulation/rank_trial values, rather than assuming a row order --
+  # emmeans/subset() do not guarantee row order, so a positional weight
+  # vector (e.g. c(-1, 1)) can silently pick up the wrong sign.
+  gridDf <- as.data.frame(emmCont@grid)
+  weights <- case_when(
+    gridDf$manipulation == "test"    & gridDf$rank_trial == testEnd  ~  1,
+    gridDf$manipulation == "control" & gridDf$rank_trial == ctrlStart ~ -1,
+    TRUE ~ 0
+  )
+  cont <- contrast(emmCont, list("test_end - control_start" = weights))
 
-    contLink <- summary(cont, infer = c(TRUE, TRUE)) %>%
-      rename(logOddsRatio = estimate) %>%
-      mutate(experiment = exp_id, control_start = ctrlStart, test_end = testEnd)
+  contLink <- summary(cont, infer = c(TRUE, TRUE)) %>%
+    rename(logOddsRatio = estimate) %>%
+    mutate(experiment = experiment_id, control_start = ctrlStart, test_end = testEnd)
 
-    contResp <- as.data.frame(summary(cont, type = "response")) %>%
-      mutate(experiment = exp_id, control_start = ctrlStart, test_end = testEnd)
+  contResp <- as.data.frame(summary(cont, type = "response")) %>%
+    mutate(experiment = experiment_id, control_start = ctrlStart, test_end = testEnd)
 
-    list(emmAll = emmAll, contLink = contLink, contResp = contResp)
-  }
-)
+  list(emmAll = emmAll, contLink = contLink, contResp = contResp)
+}
+
+emmPredCont <- map2(mTc, names(mTc), compute_tc_contrast)
 
 emmPredCont <- transpose(emmPredCont)
 emmPredCont <- map(emmPredCont, list_rbind)
@@ -167,6 +175,7 @@ emmTcPts <- emmTcAll %>%
     (manipulation == "test"    & rank_trial == max(rank_trial)) |
     (manipulation == "control" & rank_trial == 1)
   )
+
 
 # -----------------------------------------------------------------------------
 # Combined emmAll and emmPts (single source of truth for predictions)
@@ -216,7 +225,8 @@ choices_rolling <- choices %>%
   group_by(rank_trial, experiment, nat_or_art, manipulation) %>%
   summarise(pcorr = mean(pcorr), .groups = "drop")
 
-# make a combined model to compare perp-para results
+
+
 
 # -----------------------------------------------------------------------------
 # Save

@@ -13,6 +13,7 @@ library(tidyverse)
 library(scales)
 
 load("scripts/intermediate_outputs/analysis_results.RData")
+load("scripts/intermediate_outputs/experiment_comparisons.RData")
 
 source("functions/format_numeric_cols.R")
 source("functions/make_confint_col.R")
@@ -43,6 +44,13 @@ source("scripts/format_results_helpers/format_contTcLn.R")   # -> contTcLnRef, c
 
 contrastsRef <- contTcLnRef
 contrastsTbl <- contTcLnTbl
+
+# -----------------------------------------------------------------------------
+# Format the perpendicular/parallel vs. oblique planned comparison
+# Produces: artCompareRef
+# -----------------------------------------------------------------------------
+
+source("scripts/format_results_helpers/format_artCompare.R")   # -> artCompareRef
 
 # -----------------------------------------------------------------------------
 # Sample size summaries
@@ -92,6 +100,7 @@ save(
   allTrialSlopeTbl,
   contrastsRef,
   contrastsTbl,
+  artCompareRef,
   q2ArtTableOrder,
   q2ArtTcContrastTable,
   choices_rolling,

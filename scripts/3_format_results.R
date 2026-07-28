@@ -1,15 +1,18 @@
 # =============================================================================
-# format_results.R
+# 3_format_results.R
 # Transforms raw model outputs into display-ready tables for the manuscript.
-# Must be run after run_analysis.R.
-# Output: scripts/glm_analysis/formatted_results.RData
+# Must be run after 2_fit_models.R.
+# Output: scripts/intermediate_outputs/formatted_results.RData
 #
 # Run from the project root directory (where data_analysis.Rproj lives).
 # =============================================================================
 
 setwd(rprojroot::find_rstudio_root_file())
 
-load("scripts/glm_analysis/analysis_results.RData")
+library(tidyverse)
+library(scales)
+
+load("scripts/intermediate_outputs/analysis_results.RData")
 
 source("functions/format_numeric_cols.R")
 source("functions/make_confint_col.R")
@@ -20,7 +23,7 @@ source("functions/format_tables.R")
 # Produces: emmPtsRef, emmPtsTbl
 # -----------------------------------------------------------------------------
 
-source("scripts/glm_analysis/formatting_tables/format_emmPts.R")     # -> emmPtsRef, emmPtsTbl
+source("scripts/format_results_helpers/format_emmPts.R")     # -> emmPtsRef, emmPtsTbl
 
 # -----------------------------------------------------------------------------
 # Format model coefficients (test-only and test-control combined)
@@ -29,19 +32,17 @@ source("scripts/glm_analysis/formatting_tables/format_emmPts.R")     # -> emmPts
 # -----------------------------------------------------------------------------
 
 mAllCoefs <- bind_rows(mTestCoefs, mTcCoefs)
-source("scripts/glm_analysis/formatting_tables/format_mAllCoefs.R")
+source("scripts/format_results_helpers/format_mAllCoefs.R")
 
 # -----------------------------------------------------------------------------
 # Format test-control contrasts
 # Produces: contrastRes (contrasts only)
 # -----------------------------------------------------------------------------
 
-source("scripts/glm_analysis/formatting_tables/format_contTcLn.R")   # -> contTcLnRef, contTcLnTbl
+source("scripts/format_results_helpers/format_contTcLn.R")   # -> contTcLnRef, contTcLnTbl
 
-contrastRes <- list(
-  contrastsRef = contTcLnRef,
-  contrastsTbl = contTcLnTbl
-)
+contrastsRef <- contTcLnRef
+contrastsTbl <- contTcLnTbl
 
 # -----------------------------------------------------------------------------
 # Sample size summaries
@@ -89,14 +90,15 @@ save(
   mAllCoefsTbl,
   allTrialSlopeRef,
   allTrialSlopeTbl,
-  contrastRes,
+  contrastsRef,
+  contrastsTbl,
   q2ArtTableOrder,
   q2ArtTcContrastTable,
   choices_rolling,
   nLabels,
   nSummary,
   plotStyle,
-  file = "scripts/glm_analysis/formatted_results.RData"
+  file = "scripts/intermediate_outputs/formatted_results.RData"
 )
 
 message("formatted_results.RData saved.")

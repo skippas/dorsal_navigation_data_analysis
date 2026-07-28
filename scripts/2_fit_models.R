@@ -1,8 +1,8 @@
 # =============================================================================
-# run_analysis.R
+# 2_fit_models.R
 # Fits all models and generates emmeans predictions.
 # Run this script when data or model specifications change.
-# Output: scripts/glm_analysis/analysis_results.RData
+# Output: scripts/intermediate_outputs/analysis_results.RData
 #
 # Run from the project root directory (where data_analysis.Rproj lives).
 # =============================================================================
@@ -22,7 +22,7 @@ setwd(rprojroot::find_rstudio_root_file())
 # Load and clean data
 # -----------------------------------------------------------------------------
 
-source("scripts/loading_cleaning.R")
+source("scripts/1_loading_cleaning.R")
 
 styleEnv <- new.env(parent = environment())
 source("scripts/custom_themes_and_colour_palettes.R", local = styleEnv)
@@ -32,7 +32,7 @@ plotStyle <- list(
 rm(styleEnv)
 
 choices %<>% filter(
-  ! experiment %in% c("thick_oblique_apis", "thickOb_140823", "thickObDiff_210924",
+  ! experiment %in% c("thick_oblique_apis", "thickObDiff_210924",
                       "perpPara_240723", "perpParaPostNatcan_090925")
 )
 
@@ -216,6 +216,8 @@ choices_rolling <- choices %>%
   group_by(rank_trial, experiment, nat_or_art, manipulation) %>%
   summarise(pcorr = mean(pcorr), .groups = "drop")
 
+# make a combined model to compare perp-para results
+
 # -----------------------------------------------------------------------------
 # Save
 # -----------------------------------------------------------------------------
@@ -227,7 +229,7 @@ save(
   mTc, mTcCoefs, contTcLn, contTcRsp,
   emmAll, emmPts,
   plotStyle,
-  file = "scripts/glm_analysis/analysis_results.RData"
+  file = "scripts/intermediate_outputs/analysis_results.RData"
 )
 
 message("analysis_results.RData saved.")

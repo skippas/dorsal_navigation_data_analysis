@@ -1,6 +1,8 @@
 # Analysis TODO
 
 ## General
+- fix the model being run in the control. I think its running free slopes for across diff conditions but i think free intercepts is more reasonable.
+- add the image diff analysis
 - [ ] Convert all results reporting to the response scale (currently mixing link and response scale) — note: slopes may need to stay on the link scale, or use a multiplicative (odds ratio) explanation instead
 - [ ] Check whether the way results sections are introduced is correct
 - [ ] Establish logic for when/where to reference tables and figures inline

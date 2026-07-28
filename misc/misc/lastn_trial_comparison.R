@@ -3,7 +3,7 @@
 # One such way is just to fit models and make the comparison at different trial numbers
 
 rm(list = ls())
-source("scripts//loading_cleaning.R")
+source("scripts/1_loading_cleaning.R")
 source("scripts//custom_themes_and_colour_palettes.R")
 
 # comparing the last n trials of different experiments

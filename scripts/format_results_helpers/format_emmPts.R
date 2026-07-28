@@ -1,7 +1,7 @@
 # Objects created:
 # emmPtsFmt, emmPtsRef, emmPtsTbl
 #
-# emmPts must exist in the environment (produced by run_analysis.R).
+# emmPts must exist in the environment (produced by 2_fit_models.R).
 # Columns in emmPtsRef: first_*, middle_*, last_test_*, ctrl_start_*
 # ctrl_start_* columns are NA for experiments without a control phase.
 

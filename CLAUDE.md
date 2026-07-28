@@ -171,3 +171,6 @@ Andres is under submission pressure. When we work together, prioritise ruthlessl
 - Git branch for current work: `refactor-plotting-code`
 - `manipulation` factor levels are set once in `run_analysis.R` — do not re-specify in figure chunks unless overriding for a specific reason
 - `emmPts` "Long" suffix (e.g. `emmNatTcPts`) = tidy format for plotting; no suffix or "InLine" = wide format for inline text
+
+## Git workflow
+- Always commit all current changes before beginning any new modifications.

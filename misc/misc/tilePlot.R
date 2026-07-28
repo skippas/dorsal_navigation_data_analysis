@@ -2,7 +2,7 @@
 # though i probably wont end up using it! and it cluttered the main analysis script
 
 library(tidyverse)
-source("scripts//loading_cleaning.R")
+source("scripts/1_loading_cleaning.R")
 source("scripts//custom_themes_and_colour_palettes.R")
 
 bin_trials <- function(

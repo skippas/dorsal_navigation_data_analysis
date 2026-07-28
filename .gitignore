@@ -12,5 +12,12 @@
 *.pdf
 *.docx
 
+# Regenerable pipeline outputs (see scripts/0_run_all.R)
+scripts/intermediate_outputs/
+
+# Quarto render output for 5_results_report.qmd (.tex + figure files),
+# consumed by render_figures.sh / sync_results_prose.sh in the manuscript repo
+scripts/_render/
+
 /.quarto/
 **/*.quarto_ipynb

@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit:*)",
+      "Read(//Users/andrescheepers/Library/CloudStorage/OneDrive-LundUniversity/PhD/projects/dorsal_snapshot_discrimination_project/writing/overleaf_manuscript/wasp_dorsal_snapshot_discrimination/**)",
+      "Bash(quarto render:*)",
+      "Bash(Rscript -e \"source\\(''''scripts/glm_analysis/run_analysis.R''''\\); source\\(''''scripts/glm_analysis/format_results.R''''\\)\")"
+    ]
+  }
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && git add -A && git diff-index --quiet HEAD || git commit -m \"snapshot before claude edit\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}
+

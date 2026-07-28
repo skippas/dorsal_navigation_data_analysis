@@ -356,9 +356,9 @@ natcan6_070925 <- natcan6_sheets %>%
 
 # perpPara directly following natcan6 (same individuals and time of season) 
 
-perpParaPostNatcan_090925 <- 
+perpParaPostNatcan_090925 <-
   read_and_process_sheet(
-    file_path = 'data/raw/2025/natcan6_070925.xlsx',
+    file_path = 'data/raw/2025/perpParaFollowingNatcan_090925.xlsx',
     sheet_name = "perpPara_090925",
     date = c("09-09-2025"),
     manipulation = c("test"),

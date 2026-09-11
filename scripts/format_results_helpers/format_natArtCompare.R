@@ -1,28 +1,28 @@
 # Objects created:
-# artCompareRef   -- the contrast (odds ratio, CI, p), single row
-# artCompareGrp   -- per-experiment predicted P_corr with CIs, row names are
-#                    experiment IDs (e.g. artCompareGrp["perpPara_170725", "prob"])
+# natArtCompareRef  -- the contrast (odds ratio, CI, p), single row
+# natArtCompareGrp  -- per-category predicted P_corr with CIs, row names are
+#                      "artificial" / "naturalistic"
 #
-# artContrastResp and emmArtCompare must exist in the environment (produced by
-# cross_experiment_comparisons.R).
+# natArtContrastResp and emmNatArtCompare must exist in the environment
+# (produced by cross_experiment_comparisons.R).
 
-artCompareRef <- artContrastResp %>%
+natArtCompareRef <- natArtContrastResp %>%
   rename(oddsRatio = odds.ratio) %>%
   mutate(pFmt = pvalue(p.value)) %>%
   fmtNumCols() %>%
   make_confint_col(lower_col = "asymp.LCL", upper_col = "asymp.UCL",
                     out_col = "confint", prefix = "[", suffix = "]")
 
-# Per-experiment predicted probabilities at the contrast trial, as whole
+# Per-category predicted probabilities at the contrast trial, as whole
 # percentages, matching how P_corr is reported elsewhere in the manuscript.
-artCompareGrp <- summary(emmArtCompare, type = "response") %>%
+natArtCompareGrp <- summary(emmNatArtCompare, type = "response") %>%
   as.data.frame() %>%
   remove_rownames() %>%
   transmute(
-    experiment,
+    nat_or_art,
     prob    = as.character(as.integer(round(prob * 100))),
     confint = sprintf("[%d, %d]",
                       as.integer(round(asymp.LCL * 100)),
                       as.integer(round(asymp.UCL * 100)))
   ) %>%
-  column_to_rownames("experiment")
+  column_to_rownames("nat_or_art")

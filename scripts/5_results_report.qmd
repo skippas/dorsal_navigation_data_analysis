@@ -6,6 +6,7 @@ format:
     pdf-engine: pdflatex
     include-in-header:
       text: |
+        \usepackage{natbib}
         \usepackage{pdflscape}
         \usepackage{caption}
         \captionsetup{format=plain, labelsep=period, justification=justified, singlelinecheck=false, indention=0pt}
@@ -51,70 +52,56 @@ source("functions/format_numeric_cols.R")
 
 load("scripts/intermediate_outputs/formatted_results.RData")
 
-# Display name lookups. Keys are raw experiment IDs; values are display names.
-artLabels <- c(
-  perpPara_170725   = "Perp./Para.",
-  thickOb_140823    = "Thick oblique",
-  thinOb_150823     = "Oblique \u00b145\u00b0",
-  brightDiff_250725 = "Transp./opaque"
-)
+# Display name lookups (artLabels, natcanLabels, natcanImgLabels, artImgLabels)
+# -- shared with the plotting functions built in 3_format_results.R, so this
+# is sourced rather than defined here directly.
+source("scripts/plotting/plot_label_lookups.R")
 
-natcanLabels <- c(
-  natcan1_170923 = "Canopy E",
-  natcan2_300725 = "Canopy F",
-  natcan3_080825 = "Canopy G1",
-  natcan3_190925 = "Canopy G2",
-  natcan4_180825 = "Canopy H",
-  natcan5_290825 = "Canopy I",
-  natcan6_070925 = "Canopy J"
-)
-
-# HTML image labels for ggtext strip rendering
-# TODO: canopyD.png is missing from the new icon directory — add it or confirm canopyJ.png is its replacement
-stimPngDir <- "../figures_and_schematics/legend_icons/stimulus_pair_icons"
-imgW <- 65
-
-natcanImgLabels <- c(
-  "Canopy E"  = paste0("<img src='", stimPngDir, "/canopyE.png' width='", imgW, "'/><br/>**Canopy E**"),
-  "Canopy F"  = paste0("<img src='", stimPngDir, "/canopyF.png' width='", imgW, "'/><br/>**Canopy F**"),
-  "Canopy G1" = paste0("<img src='", stimPngDir, "/canopyG.png' width='", imgW, "'/><br/>**Canopy G1**"),
-  "Canopy G2" = paste0("<img src='", stimPngDir, "/canopyG.png' width='", imgW, "'/><br/>**Canopy G2**"),
-  "Canopy H"  = paste0("<img src='", stimPngDir, "/canopyH.png' width='", imgW, "'/><br/>**Canopy H**"),
-  "Canopy I"  = paste0("<img src='", stimPngDir, "/canopyI.png' width='", imgW, "'/><br/>**Canopy I**"),
-  "Canopy J"  = paste0("<img src='", stimPngDir, "/canopyJ.png' width='", imgW, "'/><br/>**Canopy J**")
-)
-
-artImgLabels <- setNames(
-  c(
-    paste0("<img src='", stimPngDir, "/perpPara.png' width='",    imgW, "'/><br/>**Perp./Para.**"),
-    paste0("<img src='", stimPngDir, "/thickOb.png' width='",     imgW, "'/><br/>**Thick oblique**"),
-    paste0("<img src='", stimPngDir, "/thinOb.png' width='",      imgW, "'/><br/>**Oblique \u00b145\u00b0**"),
-    paste0("<img src='", stimPngDir, "/brightDiff.png' width='",  imgW, "'/><br/>**Transp./Opaque**")
-  ),
-  unname(artLabels)
-)
 
 ```
 
-Evidence that wasps can use overhead patterns to navigate comes from two observations. First, that the proportion of choices for the rewarding pattern $P_{\mathrm{corr}}$ is >50% and second, that this proportion drops when the patterns are removed from the ceiling (during the control). We begin by asking whether wasps can discriminate stimulus patterns consisting of black stripes oriented perpendicularly to each other on the first-chamber ceilings of the two Y-maze arms (for stimulus conditions, see Figure 2A).
+Evidence that wasps can use overhead patterns to navigate comes from two
+observations. First, that the proportion of choices for the rewarding
+pattern $P_{\mathrm{corr}}$ is \>50% and second, that this proportion
+drops when the patterns are removed from the ceiling (during the
+control). We begin by asking whether wasps can discriminate stimulus
+patterns consisting of black stripes oriented perpendicularly to each
+other on the first-chamber ceilings of the two Y-maze arms (for stimulus
+conditions, see Figure 2A).
 
-# Can wasps discriminate 'simple' artificial dorsal patterns?
+## Can wasps discriminate 'simple' artificial dorsal patterns?
 
-For the test phase of the perpendicular-parallel artificial stimulus pair, trial number had a significant positive effect on $P_{\mathrm{corr}}$ (@fig-q2, solid line;
-p`r mAllCoefsRef["perpPara_170725", "rank_trial_pFmt"]`), with $P_{\mathrm{corr}}$ rising from
-`r emmPtsRef["perpPara_170725", "first_prob"]`% (95% CI `r emmPtsRef["perpPara_170725", "first_confint"]`) at trial 1 to `r emmPtsRef["perpPara_170725", "last_test_prob"]`% (95% CI
-`r emmPtsRef["perpPara_170725", "last_test_confint"]`) by test end (@tbl-overview), which was significantly above chance (lower 95% CI bound \>50%; @fig-q2 test panel).
+For the test phase of the perpendicular-parallel artificial stimulus
+pair, trial number had a significant positive effect on
+$P_{\mathrm{corr}}$ ([@fig-q2]A, solid line;
+p`r mAllCoefsRef["perpPara_170725", "rank_trial_pFmt"]`), with
+$P_{\mathrm{corr}}$ rising from
+`r emmPtsRef["perpPara_170725", "first_prob"]`% (95% CI
+`r emmPtsRef["perpPara_170725", "first_confint"]`) at trial 1 to
+`r emmPtsRef["perpPara_170725", "last_test_prob"]`% (95% CI
+`r emmPtsRef["perpPara_170725", "last_test_confint"]`) by test end, at
+trial `r emmPtsRef["perpPara_170725", "last_test_rank_trial"]`
+(@tbl-overview), which was significantly above chance (lower 95% CI
+bound \>50%; @fig-q2 test panel).
 
-Additionally a Wald z-test revealed end-of-test $P_{\mathrm{corr}}$ was significantly higher than at the start of the control phase (`r emmPtsRef["perpPara_170725", "ctrl_start_prob"]`%, 95% CI
-`r emmPtsRef["perpPara_170725", "ctrl_start_confint"]`; @fig-q2) with the log-odds ratio between these points significantly greater than 0 (p`r contrastsRef["perpPara_170725", "pFmt"]`).
+Additionally a Wald z-test revealed end-of-test $P_{\mathrm{corr}}$ was
+significantly higher than at the start of the control phase
+(`r emmPtsRef["perpPara_170725", "ctrl_start_prob"]`%, 95% CI
+`r emmPtsRef["perpPara_170725", "ctrl_start_confint"]`; [@fig-q2]A), with an
+odds ratio of `r contrastsRef["perpPara_170725", "odds.ratio"]`
+(p`r contrastsRef["perpPara_170725", "pFmt"]`; @tbl-overview).
 
-Also note that $P_{\mathrm{corr}}$ is significantly above chance from an early trial number (grey
-shaded 95% confidence ribbon in @fig-q2 does not overlap the 50% line) and remains that way until the end of the test.
-In contrast, the $P_{\mathrm{corr}}$ in the control phase is never
+Also note that $P_{\mathrm{corr}}$ is significantly above chance from an
+early trial number (grey shaded 95% confidence ribbon in [@fig-q2]A does
+not overlap the 50% line) and remains that way until the end of the
+test. In contrast, the $P_{\mathrm{corr}}$ in the control phase is never
 significantly above chance for the duration of the control (95%
 confidence ribbon overlaps the 50% line), as one would expect for wasps
 making choices in the absence of any information regarding the location
 of the reward.
+
+<!-- I've removed below paragraph because honestly I'm not sure what the reason
+for an elevated prediction at trial 1 could be.
 
 That the model suggests naive wasps nearly perform significantly above
 chance at the onset of the test phase (ie. in trial 1) is possibly due
@@ -122,80 +109,16 @@ to the model being unable to fit the rapid learning of the wasps, rather
 than to the wasps having learned olfactory / temporal cues during the
 pre-test training phase that persisted into the test. This is supported
 by the proportion of correct decisions in the first few 3-trial wide
-windows of the test phase (grey points, @fig-q2) that are clustered around 50%.
+windows of the test phase (grey points, [@fig-q2]A) that are clustered
+around 50%. -->
 
-# What information are wasps using to discriminate patterns?
+## What information are wasps using to discriminate patterns?
 
 ```{r fig-q2}
-#| fig-cap: 'Wasp reward-navigation performance for artificial stimulus experiments. Each row shows one experiment with a particular pair of stimuli (stimulus conditions as in Figure 2A-D); columns show test and, when run, control phases per experiment. During the test phase, overhead artificial stimuli could be used by the wasps to choose the rewarding chamber, but during the control phase, when these stimuli were removed, performance dropped to chance levels. The y-axis represents the probability of a wasp entering (or "choosing") the second arm chamber that contained the reward (constituting a "correct choice"). The solid black line shows the predicted probability of correct choices across trials and the grey ribbon the 95% confidence interval around these probabilities given by the models. Grey points are the proportion (not the probability) of correct choices made by all wasps in 3-trial wide rolling windows. Black points represent the predicted probabilities of correct choices at the end of the test and the start of the control phases, and the error bars the 95% confidence intervals around these predictions. The dashed horizontal line represents chance performance (50%). Only the first choice of each wasp in each trial was used as data in the model and to calculate the rolling means.'
-#| fig-height: 5
+#| fig-cap: 'Wasp reward-navigation performance for artificial stimulus experiments. Each row shows one experiment with a particular pair of stimuli (stimulus conditions as in Figure 2A-D); columns show test and, when run, control phases per experiment. During the test phase, overhead artificial stimuli could be used by the wasps to choose the rewarding chamber, but during the control phase, when these stimuli were removed, performance dropped to chance levels. The y-axis represents $P_{\mathrm{corr}}$, the probability of a wasp entering (or "choosing") the second arm chamber that contained the reward (constituting a "correct choice"). The solid black line shows the predicted probability of correct choices across trials and the grey ribbon the 95% confidence interval around these probabilities given by the models. Grey points are the proportion (not the probability) of correct choices made by all wasps in 3-trial wide rolling windows. Points represent the predicted probabilities of correct choices at the end of the test and the start of the control phases, and the error bars the 95% confidence intervals around these predictions. For the perpendicular/parallel pair the end-of-test point (trial 47) is drawn as an open circle and repeated on the thin-oblique test panel, so that the two pairs can be compared at the same trial `(Eq.~\ref{eq:martcompare})`{=latex}. The dashed horizontal line represents chance performance (50%). Only the first choice of each wasp in each trial was used as data in the model and to calculate the rolling means.'
+#| fig-height: 4.6
 
-q2ExpOrder <- c("perpPara_170725", "thinOb_150823", "thickOb_140823", "brightDiff_250725")
-
-emmAllArt <- emmAll %>%
-  filter(experiment %in% q2ExpOrder) %>%
-  mutate(
-    experiment = recode(experiment, !!!artLabels),
-    experiment = factor(experiment, levels = unname(artLabels[q2ExpOrder])),
-    manipulation = factor(manipulation, levels = c("test", "control"))
-  )
-
-p <- ggplot(emmAllArt, aes(x = rank_trial, y = prob)) +
-  geom_ribbon(aes(ymin = asymp.LCL, ymax = asymp.UCL), alpha = 0.2) +
-  geom_line() +
-  labs(x = "Trial", y = "Probability of correct choice (%)") +
-  scale_y_continuous(labels = function(x) x * 100) +
-  geom_hline(yintercept = 0.5, lty = 2) +
-  theme_bw() +
-  facet_grid(experiment ~ manipulation, scales = "free_x",
-             labeller = labeller(experiment = as_labeller(artImgLabels))) +
-  theme(panel.spacing.y = unit(1, "lines"),
-        panel.spacing.x = unit(0, "lines"),
-        strip.background = element_blank(),
-        strip.text.y.right = ggtext::element_markdown(angle = 0)
-)
-
-rollingArt <- choices_rolling %>%
-  filter(experiment %in% q2ExpOrder) %>%
-  mutate(
-    experiment = recode(experiment, !!!artLabels),
-    experiment = factor(experiment, levels = unname(artLabels[q2ExpOrder])),
-    manipulation = factor(manipulation, levels = c("test", "control"))
-  )
-
-p <- p + geom_point(data = rollingArt, aes(x = rank_trial, y = pcorr),
-                    colour = "black", alpha = 0.1)
-
-emmPtsArt <- emmPts %>%
-  filter(experiment %in% q2ExpOrder,
-         trial_pos %in% c("last_test", "ctrl_start")) %>%
-  mutate(
-    experiment = recode(experiment, !!!artLabels),
-    experiment = factor(experiment, levels = unname(artLabels[q2ExpOrder]))
-  )
-
-p <- p +
-  geom_errorbar(data = emmPtsArt,
-                aes(x = rank_trial, ymin = asymp.LCL, ymax = asymp.UCL),
-                width = 2) +
-  geom_point(data = emmPtsArt, aes(x = rank_trial, y = prob))
-
-p <- p +
-  geom_text(
-    data = nLabels %>%
-      filter(experiment %in% q2ExpOrder) %>%
-      mutate(
-        experiment   = recode(experiment, !!!artLabels),
-        experiment   = factor(experiment, levels = unname(artLabels[q2ExpOrder])),
-        manipulation = factor(manipulation, levels = c("test", "control"))
-      ),
-    aes(label = label),
-    x = Inf, y = -Inf, hjust = 1.05, vjust = -0.3,
-    size = 2.5, inherit.aes = FALSE
-  )
-
-print(p)
-rm(q2ExpOrder, emmAllArt, rollingArt, emmPtsArt, p)
+print(fig_q2)
 ```
 
 ```{r q2ContrastArtStimuli}
@@ -205,234 +128,163 @@ q2TrialSlopeTable <- allTrialSlopeRef %>%
 
 ```
 
-In the previous experiment (@fig-q2, top), wasps may have located the rewarding arm by using the different extents of optic flow encountered when flying under the parallel and perpendicular stripes (respectively the left and right panels of Figure 2A), rather than the patterns themselves. 
-Wasps would experience little optic flow with parallel stipes, and considerable optic flow with perpendicular stripes. 
-To determine whether wasps used optic flow, we next used oblique stripes oriented at either 45° to the right or 45° to the left of the Y-maze arm’s long axis and the general direction of wasp travel (for stimulus conditions, see Figure 2B,C).
-Even though these two patterns clearly differ, they will present identical optic flow in the front to back direction for wasps flying beneath them.
-Here again, we look for $P_{\mathrm{corr}}$ \>50% and a larger $P_{\mathrm{corr}}$ at the end of the test relative to the start of the control as evidence that wasps can distinguish stimuli that generate identical rates of optic flow.
+In the previous experiment ([@fig-q2]A), wasps may have located the
+rewarding arm using front-to-back optic flow differences:
+parallel stripes generate little optic flow for a wasp flying along
+them, whereas perpendicular stripes generate a great deal. To test this,
+we next used oblique stripes oriented 45° to the right or left of the
+Y-maze arm’s long axis (for stimulus conditions, see Figure 2B,C).
+Because local motion detectors respond to the component of
+optic flow perpendicular to an edge or contour
+`\citep{Borst1993}`{=latex}, these two patterns generate an equal
+front-to-back optic flow component, differing only in the direction of
+their left--right component (a consequence of the aperture problem). If
+wasps rely on front-to-back optic flow, they should discriminate the oblique
+pair poorly, or at least less well than the perpendicular-parallel pair.
 
-Wasps had no trouble distinguishing between oblique stripes that produce identical rates of front to back optic flow in the dorsal visual field (@fig-q2, row two and three). 
-For the thin oblique stripe condition (Figure 2B), trial had a significant positive effect on
-$P_{\mathrm{corr}}$ (p`r q2TrialSlopeTable["thinOb_150823", "pFmt"]`; @tbl-model-coefs),
-with performance rising from `r emmPtsRef["thinOb_150823", "first_prob"]`% (95% CI `r emmPtsRef["thinOb_150823", "first_confint"]`) at trial 1 to `r emmPtsRef["thinOb_150823", "last_test_prob"]`% (95% CI `r emmPtsRef["thinOb_150823", "last_test_confint"]`) by test end --- significantly above chance (50%). $P_{\mathrm{corr}}$ at test end was also significantly above performance at the start of the control phase (`r emmPtsRef["thinOb_150823", "ctrl_start_prob"]`%, 95% CI `r emmPtsRef["thinOb_150823", "ctrl_start_confint"]`; p`r contrastsRef["thinOb_150823","pFmt"]`). Again, the  $P_{\mathrm{corr}}$ in the control phase was never significantly above chance for the duration of the control (95% confidence ribbon overlaps the 50% line),
+Wasps had no trouble distinguishing between oblique stripes that produce
+similar rates of front to back optic flow in the dorsal visual field
+([@fig-q2]B, C). For the thin oblique stripe condition
+(Figure 2B; [@fig-q2]B), trial had a significant positive effect on
+$P_{\mathrm{corr}}$ (p`r q2TrialSlopeTable["thinOb_150823", "pFmt"]`;
+@tbl-model-coefs), with performance rising from
+`r emmPtsRef["thinOb_150823", "first_prob"]`% (95% CI
+`r emmPtsRef["thinOb_150823", "first_confint"]`) at trial 1 to
+`r emmPtsRef["thinOb_150823", "last_test_prob"]`% (95% CI
+`r emmPtsRef["thinOb_150823", "last_test_confint"]`) by test end, at
+trial `r emmPtsRef["thinOb_150823", "last_test_rank_trial"]` ---
+significantly above chance (50%). $P_{\mathrm{corr}}$ at test end was
+also significantly above performance at the start of the control phase
+(`r emmPtsRef["thinOb_150823", "ctrl_start_prob"]`%, 95% CI
+`r emmPtsRef["thinOb_150823", "ctrl_start_confint"]`), with an odds ratio
+of `r contrastsRef["thinOb_150823", "odds.ratio"]`
+(p`r contrastsRef["thinOb_150823","pFmt"]`; @tbl-overview). Again, the
+$P_{\mathrm{corr}}$ in the control phase was never significantly above
+chance for the duration of the control (95% confidence ribbon overlaps
+the 50% line),
 
-For the thick oblique experiment (Figure 2C), trial had a positive but non-significant effect on
-$P_{\mathrm{corr}}$ (p = `r q2TrialSlopeTable["thickOb_140823", "pFmt"]`; @tbl-model-coefs),
-with performance rising from `r emmPtsRef["thickOb_140823", "first_prob"]`%
-to `r emmPtsRef["thickOb_140823", "last_test_prob"]`% by test end ---
-also significantly above chance.
+For the thick oblique experiment (Figure 2C; [@fig-q2]C), trial had a positive but
+non-significant effect on $P_{\mathrm{corr}}$ (p =
+`r q2TrialSlopeTable["thickOb_140823", "pFmt"]`; @tbl-model-coefs), with
+performance rising from `r emmPtsRef["thickOb_140823", "first_prob"]`%
+to `r emmPtsRef["thickOb_140823", "last_test_prob"]`% by test end, at
+trial `r emmPtsRef["thickOb_140823", "last_test_rank_trial"]` ---
+also significantly above chance. Taken together, the above results show that at least front to back optic flow is not necessary for pattern discrimination.
 
-Performance also differed between stimulus types: wasps discriminated the
-perpendicular/parallel stimulus pair significantly better than the average of
-the two oblique pairs (odds ratio `r artCompareRef$oddsRatio`,
-95% CI `r artCompareRef$confint`, p = `r artCompareRef$pFmt`), indicating that
+Performance also differed between stimulus types: at the same trial-point
+in both experiments (trial 47; [@fig-q2]A, B, open points), $P_{\mathrm{corr}}$ was
+`r artCompareGrp["perpPara_170725", "prob"]`% (95% CI
+`r artCompareGrp["perpPara_170725", "confint"]`) for the
+perpendicular/parallel pair and
+`r artCompareGrp["thinOb_150823", "prob"]`%
+(`r artCompareGrp["thinOb_150823", "confint"]`) for the thin oblique
+pair (odds ratio `r artCompareRef$oddsRatio`, 95% CI
+`r artCompareRef$confint`, p = `r artCompareRef$pFmt`;
+Table `\ref{tbl-cross-coefs}`{=latex}), indicating that
 discrimination is not equally easy for all artificial patterns tested.
+Since the perpendicular-parallel pair presents a stronger combined optic
+flow contrast than the thin oblique pair, this suggests that optic
+flow contrast may contribute to pattern discrimination. However, since
+each stimulus type is represented by a single experiment, we cannot rule
+out that this difference is due to variation at the level of the
+experiment (e.g., wasp cohort, testing day, or season) rather than the
+stimulus pair itself. Side biases were substantial in these two experiments and ran in
+opposite directions: with the perpendicular-parallel pair wasps chose
+correctly on `r sideBiasRef["perpPara_170725", "L"]`% of left-reward and
+`r sideBiasRef["perpPara_170725", "R"]`% of right-reward trials, whereas
+with the thin oblique pair the figures were
+`r sideBiasRef["thinOb_150823", "L"]`% and
+`r sideBiasRef["thinOb_150823", "R"]`% (raw test-phase proportions; model
+estimates in @tbl-model-coefs). Reward side is therefore included in
+every model and, in the joint model, allowed to differ between
+experiments `(Eq.~\ref{eq:martcompare})`{=latex}.
 
 Next, we asked whether wasps could discriminate between an opaque and
-transparent ceiling, ie. between stimuli that carried little to no pattern
-information but with clear differences in brightness (stimulus condition as in Figure 2C). 
-Trial had a positive but non-significant effect on $P_{\mathrm{corr}}$ (p = `r q2TrialSlopeTable["brightDiff_250725", "pFmt"]`; @tbl-model-coefs),
+transparent ceiling, i.e. between stimuli that lacked
+pattern information but presented clear differences in brightness (stimulus
+condition as in Figure 2D; [@fig-q2]D). Trial had a positive but non-significant
+effect on $P_{\mathrm{corr}}$ (p =
+`r q2TrialSlopeTable["brightDiff_250725", "pFmt"]`; @tbl-model-coefs),
 likely due to the shorter number of trials run in this experiment, and
 performance rose from `r emmPtsRef["brightDiff_250725", "first_prob"]`%
-(95% CI `r emmPtsRef["brightDiff_250725", "first_confint"]`) at trial 1 to
-`r emmPtsRef["brightDiff_250725", "last_test_prob"]`% (95% CI
-`r emmPtsRef["brightDiff_250725", "last_test_confint"]`) by test end.
+(95% CI `r emmPtsRef["brightDiff_250725", "first_confint"]`) at trial 1
+to `r emmPtsRef["brightDiff_250725", "last_test_prob"]`% (95% CI
+`r emmPtsRef["brightDiff_250725", "last_test_confint"]`) by test end, at
+trial `r emmPtsRef["brightDiff_250725", "last_test_rank_trial"]`.
 While performance at the end of the experiment is only borderline
-significantly higher than 50%, this is likely an artifact of the
+significantly higher than 50%, this is likely an artefact of the
 increased uncertainty in the slope / effect of trial number on
-performance due to the lower number of trials run in this experiment. 
-If one for example looks at the middle trials (@tbl-overview), the lower bound of
-performance is considerably higher than chance.
+performance due to the lower number of trials run in this experiment. If
+one for example looks at the middle trials (@tbl-overview), the lower
+bound of performance is considerably higher than chance.
 
-# Can wasps use naturalistic patterns for navigation?
+## Can wasps use naturalistic patterns for navigation?
 
 ```{r fig-q3-tc}
-#| fig-cap: 'Wasp reward-navigation performance for six naturalistic stimulus experiments. Each row shows wasp performance over two phases (columns, test and control) of an experiment. In the test phase a pair of naturalistic stimuli (at right) were displayed from above in a Y-maze, with one of the stimuli in the pair associated with a reward and the other with no reward (see Methods for further details). During the control phase the stimuli were removed but the reward remained in place. Not all experiments had a control phase (blank panels). Note that performance is only significantly above chance for some stimulus pairs / experiments, and that predicted performance at the end of the test is rarely significantly higher than at the start of the control. All other figure conventions as in Figure 3.'
+#| fig-cap: 'Wasp reward-navigation performance for six naturalistic forest canopy stimuli. Each row shows wasp performance over two phases (columns: test and control) of each experiment. In the test phase, a pair of naturalistic stimuli (at right) were displayed dorsally in a Y-maze, with one of the stimuli in the pair associated with a reward and the other with no reward (see Methods for further details). During the control phase the stimuli were removed but the reward remained in place. Not all experiments had a control phase (blank panels). Note that performance is only significantly above chance for some stimulus pairs / experiments, and that predicted performance at the end of the test is rarely significantly higher than at the start of the control. All other figure conventions as in Figure 3.'
 #| fig-height: 5
 #| fig-pos: "p"
 
-emmAllNat <- emmAll %>%
-  filter(nat_or_art == "naturalistic", experiment != "natcan3_080825") %>%
-  droplevels() %>%
-  mutate(experiment = recode(experiment, !!!natcanLabels))
-emmPtsNat <- emmPts %>%
-  filter(nat_or_art == "naturalistic", experiment != "natcan3_080825",
-         trial_pos %in% c("last_test", "ctrl_start")) %>%
-  droplevels() %>%
-  mutate(experiment = recode(experiment, !!!natcanLabels))
-tbNatTcPts  <- emmPtsRef %>% filter(nat_or_art == "naturalistic",
-                                     rownames(.) != "natcan3_080825")
-
-rollingNat <- choices_rolling %>%
-  filter(nat_or_art == "naturalistic", experiment != "natcan3_080825") %>%
-  droplevels() %>%
-  mutate(experiment = recode(experiment, !!!natcanLabels))
-
-p <- ggplot(emmAllNat, aes(x = rank_trial, y = prob)) +
-  geom_line() +
-  geom_ribbon(
-    aes(ymin = asymp.LCL, ymax = asymp.UCL),
-    alpha = 0.15,
-    colour = NA
-  ) +
-  scale_y_continuous(labels = function(x) x * 100, limits = c(0, 1)) +
-  geom_hline(yintercept = 0.5, linetype = "dashed") +
-  facet_grid(experiment ~ manipulation, scales = "free_x",
-             labeller = labeller(experiment = as_labeller(natcanImgLabels))) +
-  labs(x = "Trial", y = "Probability of correct choice (%)") +
-  theme_bw() +
-  theme(legend.position = "none", panel.spacing.y = unit(0.75, "lines"),
-        panel.spacing.x = unit(0, "lines"),
-        strip.text.y.right = ggtext::element_markdown(angle = 0),
-        strip.background = element_blank())
-
-p <- p + geom_point(data = rollingNat, aes(x = rank_trial, y = pcorr),
-                    colour = "black", alpha = 0.1)
-
-p <- p +
-  geom_errorbar(data = emmPtsNat,
-                aes(x = rank_trial, ymin = asymp.LCL, ymax = asymp.UCL),
-                width = 2) +
-  geom_point(data = emmPtsNat, aes(x = rank_trial, y = prob))
-
-p <- p +
-  geom_text(
-    data = nLabels %>%
-      filter(experiment %in% names(natcanLabels), experiment != "natcan3_080825") %>%
-      mutate(
-        experiment   = recode(experiment, !!!natcanLabels),
-        manipulation = factor(manipulation, levels = c("test", "control"))
-      ),
-    aes(label = label),
-    x = Inf, y = -Inf, hjust = 1.05, vjust = -0.3,
-    size = 2.5, inherit.aes = FALSE
-  )
-
-print(p)
-rm(emmAllNat, emmPtsNat, tbNatTcPts, rollingNat, p)
+print(fig_q3_tc)
 ```
 
-Evidence for whether wasps can discriminate naturalistic canopies (see Figure 2 D-I) at
-above-chance rates (\>50%) is mixed. 
-In three of the six naturalistic canopy pairs we tested, the predicted $P_{\mathrm{corr}}$ by the end of the test was significantly (canopy E, G2) or borderline significantly (canopy I) above chance (the lower limit of the 95% CI is \>50%; @fig-q3-tc, @tbl-overview, @fig-supp-canopyG1), but for the other three canopy pairs this was not the case. 
-This suggests that wasps may be able to separate certain pairs of naturalistic canopies, although the performance is generally lower than for artificial stimuli (see below).
+Evidence for whether wasps can discriminate naturalistic canopies (see
+Figure 2E--J) at above-chance rates (\>50%) is mixed. In three of the
+six naturalistic canopy pairs we tested, the predicted
+$P_{\mathrm{corr}}$ by the end of the test was significantly (canopy E,
+G) or borderline significantly (canopy I) above chance (the lower limit
+of the 95% CI is \>50%; [@fig-q3-tc]A, C, E, @tbl-overview, @fig-supp-canopyG1),
+but for the other three canopy pairs ([@fig-q3-tc]B, D, F) this was not the case. This
+suggests that wasps may be able to separate certain pairs of
+naturalistic canopies, although the performance is generally lower than
+for artificial stimuli (see below).
 
-Three of the naturalistic canopies showed a $P_{\mathrm{corr}}$ significantly or near-significantly greater than 50%. For two of these, we also ran a control (patterns removed) immediately after the test phase concluded, but only for Canopy E was the $P_{\mathrm{corr}}$ at the end of the test significantly higher than at the start of the control. This is likely due to two factors: $P_{\mathrm{corr}}$ for naturalistic canopies is generally only modestly above 50% to begin with (if at all), and the control phases were run for relatively few trials, which increases the uncertainty in the estimated $P_{\mathrm{corr}}$ at the start of the control.
+Three of the naturalistic canopies showed a $P_{\mathrm{corr}}$
+significantly or near-significantly greater than 50%. For two of these ([@fig-q3-tc]A, C),
+we also ran a control (patterns removed) immediately after the test
+phase concluded, but only for Canopy G was the $P_{\mathrm{corr}}$ at
+the end of the test significantly higher than at the start of the
+control. This is likely due to two factors: $P_{\mathrm{corr}}$ for
+naturalistic canopies is generally only modestly above 50% to begin with
+(if at all), and the control phases were run for relatively few trials,
+which increases the uncertainty in the estimated $P_{\mathrm{corr}}$ at
+the start of the control.
 
-# Performance differences among naturalistic and artificial stimuli
-
-```{r fig-q3-natart}
-#| fig-cap: "End-of-test predicted performance by canopy type."
-
-q3NatArtEndPts <- emmPts %>%
-  filter(trial_pos == "last_test") %>%
-  mutate(
-    nat_or_art = factor(nat_or_art, levels = c("naturalistic", "artificial"))
-  )
-
-natArtMean <- q3NatArtEndPts %>%
-  group_by(nat_or_art) %>%
-  summarise(
-    mean_prob = mean(prob),
-    min_prob  = min(prob),
-    max_prob  = max(prob),
-    .groups = "drop"
-  ) %>%
-  pivot_wider(
-    names_from  = nat_or_art,
-    values_from = c(mean_prob, min_prob, max_prob),
-    names_glue  = "{nat_or_art}_{.value}"
-  ) %>%
-  mutate(diff_mean_prob = artificial_mean_prob - naturalistic_mean_prob) %>%
-  mutate(across(ends_with("_prob"), ~as.character(as.integer(round(. * 100)))))
-
-q3NatBest  <- q3NatArtEndPts %>%
-  filter(nat_or_art == "naturalistic") %>%
-  slice_max(order_by = prob, n = 1, with_ties = FALSE) %>%
-  mutate(prob  = as.character(as.integer(round(prob * 100))),
-         label = unname(natcanLabels[experiment]))
-
-q3ArtWorst <- q3NatArtEndPts %>%
-  filter(nat_or_art == "artificial") %>%
-  slice_min(order_by = prob, n = 1, with_ties = FALSE) %>%
-  mutate(prob  = as.character(as.integer(round(prob * 100))),
-         label = unname(artLabels[experiment]))
-
-ptJitter   <- position_jitter(width = 0.08, height = 0, seed = 3)
-canopyCols <- c(naturalistic = "forestgreen", artificial = "black")
-rm(q3NatArtEndPts, ptJitter)
-```
+## Performance differences among naturalistic and artificial stimuli
 
 Discrimination performance for naturalistic canopies tends to be lower
-than for artificial canopies (@fig-q3-combined).
-The naturalistic canopy showing the best performance (`r q3NatBest$label`, $P_{\mathrm{corr}}$ =
+than for artificial canopies (@fig-q3-combined). The naturalistic canopy
+showing the best performance (`r q3NatBest$label`, $P_{\mathrm{corr}}$ =
 `r q3NatBest$prob`%) still has a lower $P_{\mathrm{corr}}$ than the
 artificial canopy with the worst performance (Transparent/Opaque,
-$P_{\mathrm{corr}}$ = `r q3ArtWorst$prob`%).
-The average performance for all naturalistic canopies is `r natArtMean$naturalistic_mean_prob`%,
-whereas for artificial stimuli it is `r natArtMean$artificial_mean_prob`%, and the difference in the average $P_{\mathrm{corr}}$ for naturalistic and artificial stimuli is `r natArtMean$diff_mean_prob`%. Given the low number of artificial and naturalistic experiments included here (4 artificial and 7 naturalistic canopy experiments), we did not test for an overall difference between naturalistic and artificial canopies.
+$P_{\mathrm{corr}}$ = `r q3ArtWorst$prob`%; both values at the end of
+the test phase). To formally test this, we fitted a GLMM
+combining all experiments (test phase only) with stimulus category
+(artificial vs. naturalistic) as a fixed effect and experiment identity
+as a random effect --- since each category is represented by several
+experiments (4 artificial, 7 naturalistic), this separates the category
+effect from ordinary experiment-to-experiment variation, with
+individuals modelled as nested within experiments. At the maximum
+test-phase trial common to all experiments (trial 26),
+$P_{\mathrm{corr}}$ was `r natArtCompareGrp["artificial", "prob"]`% (95%
+CI `r natArtCompareGrp["artificial", "confint"]`) for artificial stimuli
+and `r natArtCompareGrp["naturalistic", "prob"]`%
+(`r natArtCompareGrp["naturalistic", "confint"]`) for naturalistic
+stimuli (odds ratio `r natArtCompareRef$oddsRatio`, 95% CI
+`r natArtCompareRef$confint`, p`r natArtCompareRef$pFmt`;
+Table `\ref{tbl-cross-coefs}`{=latex}).
 
-Additionally, the effects of trial on $P_{\mathrm{corr}}$ were modest for naturalistic stimuli in comparison to artificial stimuli (compare trial coefficients in @tbl-model-coefs) and were only significantly greater than zero for canopy G2. This translated to small performance increases between trial 1 and trial 26 for naturalistic stimuli relative to artificial stimuli (@tbl-overview).
+Additionally, the effects of trial on $P_{\mathrm{corr}}$ were modest
+for naturalistic stimuli in comparison to artificial stimuli (compare
+trial coefficients in @tbl-model-coefs) and were only significantly
+greater than zero for canopy G. This translated to small performance
+increases between trial 1 and trial 26 for naturalistic stimuli relative
+to artificial stimuli (@tbl-overview).
 
 ```{r fig-q3-combined}
-#| fig-cap: "Probability of correct choices for naturalistic and artificial experiments at the maximum common test-phase trial across experiments. A. Probability of a correct choice across all experiments in the same plot (best fit lines) and 95% confidence intervals around those probabilities (shaded ribbons). The points in A show the predicted probability of a correct choice at trial 26, the maximum test-phase trial that is common to all experiments. B. The performance at trial 26 compared between artificial and naturalistic experiments. Points in B are the same as those in A."
+#| fig-cap: "Probability of correct choices for naturalistic and artificial experiments at the maximum test-phase trial common to all experiments (trial 26). A. Probability of a correct choice across all experiments in the same plot (best fit lines) and 95% confidence intervals around those probabilities (shaded ribbons). Points show the predicted probability of a correct choice at trial 26. B. A comparison of performance at trial 26 for experiments using artificial and naturalistic stimuli. Note: the points in B are the same as those in A."
 
-library(patchwork)
-
-# Per-experiment colour mapping: black for artificial, green for naturalistic
-allExpLabels <- c(artLabels, natcanLabels)
-expCols <- c(
-  setNames(rep("black",       length(artLabels)),    unname(artLabels)),
-  setNames(rep("forestgreen", length(natcanLabels)), unname(natcanLabels))
-)
-
-# Test-phase prediction curves for all experiments
-allExpTestAll <- emmAll %>%
-  filter(manipulation == "test") %>%
-  mutate(experiment = dplyr::recode(experiment, !!!allExpLabels))
-
-# Maximum shared trial: highest trial number reached by every experiment
-maxSharedTrial <- emmAll %>%
-  filter(manipulation == "test") %>%
-  group_by(experiment) %>%
-  summarise(max_trial = max(rank_trial), .groups = "drop") %>%
-  pull(max_trial) %>%
-  min()
-
-# Predicted point at the shared trial for each experiment
-emmSharedPt <- emmAll %>%
-  filter(manipulation == "test", rank_trial == maxSharedTrial) %>%
-  mutate(experiment = dplyr::recode(experiment, !!!allExpLabels))
-
-# Panel A: overlaid learning curves
-pA <- ggplot(allExpTestAll,
-             aes(x = rank_trial, y = prob,
-                 group = experiment, colour = experiment)) +
-  geom_ribbon(aes(ymin = asymp.LCL, ymax = asymp.UCL, fill = experiment),
-              colour = NA, alpha = 0.1) +
-  geom_line(alpha = 0.5) +
-  geom_hline(yintercept = 0.5, linetype = "dashed") +
-  geom_point(data = emmSharedPt, size = 2, alpha = 0.5) +
-  scale_colour_manual(values = expCols, guide = "none") +
-  scale_fill_manual(values = expCols, guide = "none") +
-  scale_y_continuous(labels = function(x) x * 100, limits = c(0.25, 1)) +
-  labs(x = "Trial", y = "Probability of correct choice (%)") +
-  theme_bw()
-
-# Panel B: jittered points at the shared trial reference point
-pB <- ggplot(emmSharedPt, aes(x = nat_or_art, y = prob)) +
-  geom_hline(yintercept = 0.5, linetype = "dashed") +
-  geom_point(aes(color = nat_or_art), size = 2, alpha = 0.7,
-             position = position_jitter(width = 0.08, height = 0, seed = 3)) +
-  scale_color_manual(values = canopyCols,
-                     labels = c(artificial = "Artificial", naturalistic = "Naturalistic")) +
-  scale_y_continuous(labels = function(x) x * 100, limits = c(0.25, 1)) +
-  labs(x = "Stimulus type", y = "Probability of correct choice (%) \nat trial 26", color = NULL) +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-print(pA + pB + plot_layout(widths = c(2, 1)) + plot_annotation(tag_levels = "A"))
-rm(allExpLabels, expCols, allExpTestAll, maxSharedTrial, emmSharedPt, pA, pB)
+print(fig_q3_combined)
 ```
 
 # Supplementary
@@ -480,67 +332,7 @@ roundNumsInString <- function(x, digits = 2) {
 #| tbl-cap: "Predicted $P_{\\mathrm{corr}}$ at key trial positions and test--control contrasts for all experiments. Control start and contrast columns are blank for test-only experiments."
 #| eval: !expr knitr::pandoc_to() != "docx"
 
-expOrder <- c(q2ArtTableOrder, names(natcanLabels))
-
-# Prediction at the maximum shared test trial across all experiments
-sharedTrial <- emmAll %>%
-  filter(manipulation == "test") %>%
-  group_by(experiment) %>%
-  summarise(max_trial = max(rank_trial), .groups = "drop") %>%
-  pull(max_trial) %>%
-  min()
-
-sharedPtTbl <- emmAll %>%
-  filter(manipulation == "test", rank_trial == sharedTrial) %>%
-  mutate(sharedPcorr95CI = paste0(
-    as.integer(round(prob * 100)), "% [",
-    as.integer(round(asymp.LCL * 100)), ", ",
-    as.integer(round(asymp.UCL * 100)), "]"
-  )) %>%
-  select(experiment, sharedPcorr95CI)
-
-allExpOverview <- emmPtsTbl %>%
-  left_join(sharedPtTbl, by = "experiment") %>%
-  left_join(
-    contrastsTbl %>% select(experiment, logOddsRatio95CI, pFmt),
-    by = "experiment"
-  ) %>%
-  left_join(nSummary, by = "experiment") %>%
-  mutate(experiment = factor(experiment, levels = expOrder)) %>%
-  arrange(experiment) %>%
-  mutate(experiment = dplyr::recode(as.character(experiment), !!!c(artLabels, natcanLabels)))
-
-n_art    <- sum(allExpOverview$nat_or_art == "artificial")
-n_nat    <- sum(allExpOverview$nat_or_art == "naturalistic")
-
-tbl <- allExpOverview %>%
-  select(experiment, firstPcorr95CI, midPcorr95CI, lastTestPcorr95CI,
-         sharedPcorr95CI, ctrlStartPcorr95CI, logOddsRatio95CI, pFmt) %>%
-  mutate(across(where(is.character), ~ if_else(is.na(.), "---", .))) %>%
-  knitr::kable(
-    col.names = c("Experiment", "Test start", "Test middle", "Test end",
-                  paste0("Trial ", sharedTrial), "Control start",
-                  "Log-odds ratio [95% CI]", "P"),
-    booktabs = TRUE, escape = FALSE
-  ) %>%
-  kableExtra::add_header_above(
-    c(" " = 1, "$P_{\\\\mathrm{corr}}$ [95\\\\% CI]" = 5, " " = 2),
-    escape = FALSE
-  ) %>%
-  kableExtra::pack_rows("Artificial", 1, n_art) %>%
-  kableExtra::pack_rows("Naturalistic", n_art + 1, n_art + n_nat) %>%
-  kableExtra::kable_styling(font_size = 9, latex_options = "hold_position")
-
-# knitr::kable converts non-ASCII chars to <U+XXXX> sequences; fix them here
-# after all kableExtra processing (which would re-escape LaTeX backslashes)
-knitr::asis_output(
-  gsub("<U\\+00B0>", "$^{\\\\circ}$",
-  gsub("<U\\+00B1>", "$\\\\pm$",
-  gsub("<U\\+2014>", "---",
-  gsub("< ", "$<$ ",
-       paste(as.character(tbl), collapse = "\n")))))
-)
-rm(expOrder, sharedTrial, sharedPtTbl, tbl)
+knitr::asis_output(tblOverviewStr)
 ```
 
 ```{=latex}
@@ -551,93 +343,13 @@ rm(expOrder, sharedTrial, sharedPtTbl, tbl)
 #| tbl-cap: "Per-experiment sample sizes and test-phase duration. Wasps and choices are split by phase (test and control). Last trial is the highest trial number reached in the test phase. Control columns are blank for test-only experiments."
 #| eval: !expr knitr::pandoc_to() != "docx"
 
-tbl2 <- allExpOverview %>%
-  select(experiment, lastTestTrial,
-         n_wasps_test, n_choices_test, n_wasps_control, n_choices_control) %>%
-  knitr::kable(
-    col.names = c("Experiment", "Last trial",
-                  "Wasps", "Choices", "Wasps", "Choices"),
-    booktabs = TRUE, escape = FALSE
-  ) %>%
-  kableExtra::add_header_above(
-    c(" " = 2, "Test" = 2, "Control" = 2),
-    escape = FALSE
-  ) %>%
-  kableExtra::pack_rows("Artificial", 1, n_art) %>%
-  kableExtra::pack_rows("Naturalistic", n_art + 1, n_art + n_nat) %>%
-  kableExtra::kable_styling(font_size = 9, latex_options = "hold_position")
-
-knitr::asis_output(
-  gsub("<U\\+2014>", "---",
-       paste(as.character(tbl2), collapse = "\n"))
-)
-rm(allExpOverview, n_art, n_nat, tbl2)
-```
-
-```{r supp-model-table-prep}
-#| include: false
-suppArtModelData <- mAllCoefsTbl %>%
-  filter(nat_or_art == "artificial") %>%
-  mutate(experiment = forcats::fct_relevel(experiment, q2ArtTableOrder)) %>%
-  arrange(experiment, term)
-
-suppNatModelData <- mAllCoefsTbl %>%
-  filter(nat_or_art == "naturalistic") %>%
-  mutate(
-    experiment = recode(experiment, !!!natcanLabels),
-    experiment = factor(experiment, levels = unname(natcanLabels))
-  ) %>%
-  arrange(experiment, term)
-
-suppModelData <- bind_rows(suppArtModelData, suppNatModelData)
-
-# Group anchors for pack_rows — art block
-suppArtModelGroups <- suppArtModelData %>%
-  group_by(experiment) %>%
-  summarise(n = n(), .groups = "drop") %>%
-  mutate(
-    end   = cumsum(n),
-    start = end - n + 1,
-    label = unname(artLabels[as.character(experiment)])
-  )
-
-# Group anchors for pack_rows — nat block (row indices continue after art block)
-artNRows <- nrow(suppArtModelData)
-suppNatModelGroups <- suppNatModelData %>%
-  group_by(experiment) %>%
-  summarise(n = n(), .groups = "drop") %>%
-  mutate(
-    end   = artNRows + cumsum(n),
-    start = end - n + 1,
-    label = as.character(experiment)
-  )
-
-suppModelTable <- suppModelData %>%
-  select(term, logOdds95CI, pFmt)
+knitr::asis_output(tblSampleSizesStr)
 ```
 
 ```{r tbl-model-coefs}
 #| tbl-cap: "Model coefficients for all experiments. Fixed effects: trial number, side alternation, reward side, and (for experiments with a control phase) experiment phase (manipulation) and its interaction with trial number. Random effect: individual ID."
 #| eval: !expr knitr::pandoc_to() != "docx"
-k <- knitr::kable(
-  suppModelTable,
-  col.names = c("Term", "Log-odds [95% CI]", "P"),
-  booktabs = TRUE, escape = FALSE
-)
-allGroups <- bind_rows(suppArtModelGroups, suppNatModelGroups)
-for (i in seq_len(nrow(allGroups))) {
-  k <- kableExtra::pack_rows(k,
-    allGroups$label[i],
-    allGroups$start[i],
-    allGroups$end[i]
-  )
-}
-knitr::asis_output(
-  gsub("<U\\+2014>", "---",
-  gsub("< ", "$<$ ",
-       paste(as.character(k), collapse = "\n")))
-)
-rm(k, allGroups)
+knitr::asis_output(tblModelCoefsStr)
 ```
 
 ## Additional experiments
@@ -651,48 +363,11 @@ rm(k, allGroups)
 print(suppFig)
 ```
 
-## Canopy G1
+## Canopy G (pilot)
 
 ```{r fig-supp-canopyG1}
-#| fig-cap: "Wasp reward-navigation performance for the Canopy G1 naturalistic stimulus experiment. This was a \"pilot\" canopy experiment that we later repeated with an increased number of trials (canopy G2 in @{fig-q3-tc}). The panels show wasp performance over the test and control phases of the experiment. All other figure conventions as in @fig-q3-tc."
+#| fig-cap: "Wasp reward-navigation performance for the Canopy G (pilot) naturalistic stimulus experiment. This was a \"pilot\" canopy experiment that we later repeated with an increased number of trials (canopy G in @{fig-q3-tc}). The panels show wasp performance over the test and control phases of the experiment. All other figure conventions as in @fig-q3-tc."
 #| fig-height: 2
 
-g1ID <- "natcan3_080825"
-
-emmG1All <- emmAll %>%
-  filter(experiment == g1ID) %>%
-  mutate(experiment = recode(experiment, !!!natcanLabels))
-emmG1Pts <- emmPts %>%
-  filter(experiment == g1ID, trial_pos %in% c("last_test", "ctrl_start")) %>%
-  mutate(experiment = recode(experiment, !!!natcanLabels))
-rollG1 <- choices_rolling %>%
-  filter(experiment == g1ID) %>%
-  mutate(experiment = recode(experiment, !!!natcanLabels))
-
-pG1 <- ggplot(emmG1All, aes(x = rank_trial, y = prob)) +
-  geom_line() +
-  geom_ribbon(aes(ymin = asymp.LCL, ymax = asymp.UCL), alpha = 0.15, colour = NA) +
-  scale_y_continuous(labels = function(x) x * 100, limits = c(0, 1)) +
-  geom_hline(yintercept = 0.5, linetype = "dashed") +
-  geom_point(data = rollG1, aes(x = rank_trial, y = pcorr), colour = "black", alpha = 0.1) +
-  geom_errorbar(data = emmG1Pts, aes(x = rank_trial, ymin = asymp.LCL, ymax = asymp.UCL), width = 2) +
-  geom_point(data = emmG1Pts, aes(x = rank_trial, y = prob)) +
-  geom_text(
-    data = nLabels %>%
-      filter(experiment == g1ID) %>%
-      mutate(experiment = recode(experiment, !!!natcanLabels),
-             manipulation = factor(manipulation, levels = c("test", "control"))),
-    aes(label = label),
-    x = Inf, y = -Inf, hjust = 1.05, vjust = -0.3, size = 2.5, inherit.aes = FALSE
-  ) +
-  facet_grid(experiment ~ manipulation, scales = "free_x",
-             labeller = labeller(experiment = as_labeller(natcanImgLabels))) +
-  labs(x = "Trial", y = "Probability of correct choice (%)") +
-  theme_bw() +
-  theme(panel.spacing.x = unit(0, "lines"),
-        strip.text.y.right = ggtext::element_markdown(angle = 0),
-        strip.background = element_blank())
-
-print(pG1)
-rm(g1ID, emmG1All, emmG1Pts, rollG1, pG1)
+print(fig_supp_canopyG1)
 ```

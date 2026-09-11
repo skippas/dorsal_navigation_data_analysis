@@ -142,7 +142,9 @@ compute_tc_contrast <- function(model, experiment_id) {
     rename(logOddsRatio = estimate) %>%
     mutate(experiment = experiment_id, control_start = ctrlStart, test_end = testEnd)
 
-  contResp <- as.data.frame(summary(cont, type = "response")) %>%
+  # infer = c(TRUE, TRUE) is required for the CI columns; without it the
+  # response-scale summary returns no asymp.LCL/asymp.UCL.
+  contResp <- as.data.frame(summary(cont, type = "response", infer = c(TRUE, TRUE))) %>%
     mutate(experiment = experiment_id, control_start = ctrlStart, test_end = testEnd)
 
   list(emmAll = emmAll, contLink = contLink, contResp = contResp)
@@ -165,6 +167,12 @@ emmTcAll <- left_join(
 
 contTcLn <- left_join(
   contTcLn,
+  unique(choices[, c("experiment", "nat_or_art")]),
+  by = "experiment"
+)
+
+contTcRsp <- left_join(
+  contTcRsp,
   unique(choices[, c("experiment", "nat_or_art")]),
   by = "experiment"
 )

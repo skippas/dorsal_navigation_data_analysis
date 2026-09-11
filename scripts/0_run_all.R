@@ -4,7 +4,7 @@
 # below and re-run to reuse its cached output in scripts/intermediate_outputs/
 # instead of regenerating it.
 #
-# compare_art_experiments.R is deliberately unnumbered -- it's a growing
+# cross_experiment_comparisons.R is deliberately unnumbered -- it's a growing
 # collection of cross-experiment comparisons, not a fixed pipeline stage. It
 # only needs to run sometime after step 1; it's placed here after step 2
 # since that's when it was introduced.
@@ -19,7 +19,7 @@ setwd(rprojroot::find_rstudio_root_file())
 
 source("scripts/1_loading_cleaning.R")
 source("scripts/2_fit_models.R")
-source("scripts/compare_art_experiments.R")
+source("scripts/cross_experiment_comparisons.R")
 source("scripts/3_format_results.R")
 source("scripts/4_run_supp_analysis.R") # steps 3 and 4 don't rely on each other (although the 3->4 numbering might make one think so)
 

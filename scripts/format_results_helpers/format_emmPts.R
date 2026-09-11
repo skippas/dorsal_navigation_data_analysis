@@ -28,16 +28,22 @@ emmPtsFmt <- emmPts %>%
 emmPtsRef <- emmPtsFmt %>%
   column_to_rownames("experiment")
 
+# In the overview table every P_corr column sits under a single "(%)" header,
+# so a per-cell % sign on all 55 cells is redundant -- strip it here. Note
+# this is deliberately NOT done to emmPtsRef, which feeds the inline prose,
+# where each value does need its own unit.
+dropPct <- function(x) sub("%$", "", x)
+
 emmPtsTbl <- emmPtsFmt %>%
   transmute(
     experiment,
     nat_or_art,
-    firstPcorr95CI     = sprintf("%s %s", first_prob,      first_confint),
-    midPcorr95CI       = sprintf("%s %s", middle_prob,     middle_confint),
-    lastTestPcorr95CI  = sprintf("%s %s", last_test_prob,  last_test_confint),
+    firstPcorr95CI     = sprintf("%s %s", first_prob,      dropPct(first_confint)),
+    midPcorr95CI       = sprintf("%s %s", middle_prob,     dropPct(middle_confint)),
+    lastTestPcorr95CI  = sprintf("%s %s", last_test_prob,  dropPct(last_test_confint)),
     ctrlStartPcorr95CI = ifelse(
       is.na(ctrl_start_prob), NA_character_,
-      sprintf("%s %s", ctrl_start_prob, ctrl_start_confint)
+      sprintf("%s %s", ctrl_start_prob, dropPct(ctrl_start_confint))
     ),
     lastTestTrial = last_test_rank_trial
   )

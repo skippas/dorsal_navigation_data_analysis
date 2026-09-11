@@ -2,6 +2,8 @@
 # mAllCoefsFmt, mAllCoefsRef, mAllCoefsTbl,
 # allTrialSlopeRef, allTrialSlopeTbl
 
+source("scripts/format_results_helpers/coef_term_labels.R")   # -> labelCoefTerms()
+
 mAllCoefsFmt <- mAllCoefs %>%
   rename(logOdds = estimate) %>%
   mutate(
@@ -30,7 +32,11 @@ mAllCoefsTbl <- mAllCoefsFmt %>%
   ) %>%
   mutate(
     logOdds95CI = if_else(term == "Individual (SD)", logOdds, logOdds95CI),
-    pFmt        = if_else(term == "Individual (SD)", "—", pFmt)
+    pFmt        = if_else(term == "Individual (SD)", "—", pFmt),
+    # Display names applied last: mAllCoefsFmt keeps the raw lme4 term names,
+    # which allTrialSlopeRef filters on and mAllCoefsRef glues into its column
+    # names (and which the qmd looks up as e.g. "rank_trial_pFmt").
+    term        = labelCoefTerms(term)
   ) %>%
   select(-logOdds)
 

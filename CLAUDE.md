@@ -124,19 +124,22 @@ Two model classes fitted in `run_analysis.R`:
 
 **`mTest`** — test-phase only, for experiments without a control:
 ```r
-glmer(decision ~ rank_trial + sideAlt_trial + reward_side + (1 | individual),
+glmer(decision ~ rank_trial + reward_side + (1 | individual),
       data = .x, family = binomial)
 ```
 
 **`mTc`** — test + control, for experiments with both phases:
 ```r
-glmer(decision ~ rank_trial * manipulation + sideAlt_trial + reward_side + (1 | individual),
+glmer(decision ~ rank_trial * manipulation + reward_side + (1 | individual),
       data = .x, family = binomial)
 ```
 
 Key predictors: `rank_trial` (learning slope), `manipulation` (test vs control),
-`sideAlt_trial` (side alternation), `reward_side` (side bias). Day and reward
-duration were considered but excluded.
+`reward_side` (side bias). Day, reward duration and `sideAlt_trial` (side
+alternation) were considered but excluded — `sideAlt_trial` had a negligible
+effect in every model and was dropped (see `misc/plan_drop_sideAlt.md`). The
+variable is still computed in `1_loading_cleaning.R` so the sensitivity check
+stays a one-line refit; only the model terms were removed.
 
 ---
 

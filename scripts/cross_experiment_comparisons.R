@@ -62,7 +62,7 @@ artCompare <- choices %>%
   mutate(trial_m1 = rank_trial - 1)
 
 mArtCompare <- glmer(
-  decision ~ trial_m1 * experiment + sideAlt_trial + reward_side * experiment +
+  decision ~ trial_m1 * experiment + reward_side * experiment +
     (1 | individual),
   data = artCompare, family = binomial,
   control = glmerControl(optimizer = "bobyqa")
@@ -124,7 +124,7 @@ natArtCompare <- choices %>%
   mutate(trial_m1 = rank_trial - 1)
 
 mNatArtCompare <- glmer(
-  decision ~ trial_m1 * nat_or_art + sideAlt_trial + reward_side +
+  decision ~ trial_m1 * nat_or_art + reward_side +
     (1 + reward_side | experiment) + (1 | experiment:individual),
   data = natArtCompare, family = binomial,
   control = glmerControl(optimizer = "bobyqa")

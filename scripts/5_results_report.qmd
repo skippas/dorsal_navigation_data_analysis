@@ -347,7 +347,7 @@ knitr::asis_output(tblSampleSizesStr)
 ```
 
 ```{r tbl-model-coefs}
-#| tbl-cap: "Model coefficients for all experiments. Fixed effects: trial number, side alternation, reward side, and (for experiments with a control phase) experiment phase (manipulation) and its interaction with trial number. Random effect: individual ID."
+#| tbl-cap: "Model coefficients for all experiments. Fixed effects: trial number, reward side, and (for experiments with a control phase) experiment phase (manipulation) and its interaction with trial number. Random effect: individual ID."
 #| eval: !expr knitr::pandoc_to() != "docx"
 knitr::asis_output(tblModelCoefsStr)
 ```

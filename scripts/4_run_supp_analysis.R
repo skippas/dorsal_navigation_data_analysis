@@ -51,7 +51,7 @@ thickObDiffDataRaw <- choices %>%
 load("scripts/intermediate_outputs/analysis_results.RData")  # -> emmAll, choices_rolling
 
 mPpPostNatcan <- glmer(
-  decision ~ rank_trial + sideAlt_trial + reward_side + (1 | individual),
+  decision ~ rank_trial + reward_side + (1 | individual),
   data = ppPostNatcanData, family = binomial
 )
 
@@ -174,13 +174,13 @@ thickObDiffData <- thickObDiffDataRaw %>%
 # Full model — test + control, no diffuser term (used for test-end vs
 # control-start contrast and for the control-phase prediction curve)
 mThickObDiff <- glmer(
-  decision ~ rank_trial * manipulation + sideAlt_trial + reward_side + (1 | individual),
+  decision ~ rank_trial * manipulation + reward_side + (1 | individual),
   data = thickObDiffData, family = binomial
 )
 
 # Test-phase model with diffuser_condition (used for per-condition emmeans)
 mThickObDiffTest <- glmer(
-  decision ~ rank_trial * diffuser_condition + sideAlt_trial + reward_side + (1 | individual),
+  decision ~ rank_trial * diffuser_condition + reward_side + (1 | individual),
   data = filter(thickObDiffData, manipulation == "test"), family = binomial
 )
 

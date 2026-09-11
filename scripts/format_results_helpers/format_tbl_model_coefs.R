@@ -50,7 +50,7 @@ k <- knitr::kable(
   col.names = c("Term", "Log-odds [95% CI]", "P"),
   caption = paste0(
     "\\label{tbl-model-coefs}Model coefficients for all experiments. ",
-    "Fixed effects: trial number, side alternation, reward side, and (for ",
+    "Fixed effects: trial number, reward side, and (for ",
     "experiments with a control phase) experiment phase (manipulation) and ",
     "its interaction with trial number. Random effect: individual ID."
   ),

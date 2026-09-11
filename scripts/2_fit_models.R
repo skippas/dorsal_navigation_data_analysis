@@ -50,7 +50,7 @@ mTest <- choices %>%
   filter(n_distinct(manipulation) == 1) %>%
   split(.$experiment, drop = TRUE) %>%
   map(~ glmer(
-    decision ~ rank_trial + sideAlt_trial + reward_side + (1 | individual),
+    decision ~ rank_trial + reward_side + (1 | individual),
     data = .x, family = binomial
   ))
 
@@ -94,7 +94,7 @@ mTc <- choices %>%
   filter(n_distinct(manipulation) > 1) %>%
   split(.$experiment, drop = TRUE) %>%
   map(~ glmer(
-    decision ~ rank_trial * manipulation + sideAlt_trial + reward_side + (1 | individual),
+    decision ~ rank_trial * manipulation + reward_side + (1 | individual),
     data = .x, family = binomial
   ))
 

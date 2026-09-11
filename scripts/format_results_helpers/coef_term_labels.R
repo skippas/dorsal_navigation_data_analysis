@@ -23,7 +23,6 @@ coefTermLabels <- c(
   "trial_m1"                           = "Trial",
 
   # nuisance predictors, common to every model
-  "sideAlt_trialTRUE"                  = "Side alternation",
   "reward_sideR"                       = "Reward side (right)",
 
   # test/control phase (within-experiment models only)
@@ -53,7 +52,6 @@ coefTermOrder <- c(
   "Trial × Stimulus pair",
   "Category (naturalistic)",
   "Trial × Category",
-  "Side alternation",
   "Reward side (right)",
   "Reward side × Stimulus pair",
   "Individual (SD)",

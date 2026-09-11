@@ -1,20 +1,22 @@
 # Analysis TODO
 
 ## General
-- [ ] **Drop `sideAlt_trial` from all models** — full plan in
+- [x] **Drop `sideAlt_trial` from all models** — DONE, see
   `misc/plan_drop_sideAlt.md`. Term has no explanatory power in any of the 13
   models reported in the two coefficient tables (all p > 0.15, all CIs span
-  zero). Seven formulas to edit, plus the coefficient-label map; supplementary
-  tables regenerate themselves.
-  - [ ] **After the refit is done: strip it from the manuscript prose too.**
-    `methods_procedure.tex` — five edits: Eqs. 1-4 (`eq:mtest`, `eq:mtc`,
-    `eq:martcompare`, `eq:natartcompare`) each lose `+ sideAlt`, and the
-    "where decision is..." paragraph loses both the sideAlt definition and the
-    "quantifies the extent to which wasps prefer the previously rewarded side"
-    clause, replaced by a one-line statement that the term was fitted, found
-    negligible, and dropped. `results_body.tex` has no sideAlt text, but every
-    inline number changes with the refit and needs a read-through — start with
-    the four at-risk results flagged in the plan.
+  zero). Seven formulas removed, coefficient-label map updated, pipeline
+  re-run; no conclusion changed (comparison table in the plan).
+  - [x] Manuscript Methods stripped of it: Eqs. 1-4 in
+    `methods_procedure.tex` lost `+ sideAlt`, and the "where decision is..."
+    paragraph now states the term was fitted, found negligible, and dropped.
+    Supplementary tables and figures regenerated and copied across.
+  - [ ] **Outstanding: re-sync `results_body.tex`.** Left untouched on purpose
+    — the manuscript's copy was synced from the *uncommitted* working-copy
+    `5_results_report.qmd`, which is ahead of what is committed, so syncing
+    from the branch render would have reverted that newer prose. Its inline
+    numbers are still pre-refit while the tables are post-refit. Fix by running
+    `render_figures.sh` then `sync_results_prose.sh` from the main checkout
+    after merging. Small shifts only (e.g. brightness trial p 0.356 -> 0.381).
 - fix the model being run in the control. I think its running free slopes for across diff conditions but i think free intercepts is more reasonable.
 - add the image diff analysis
 - [ ] Convert all results reporting to the response scale (currently mixing link and response scale) — note: slopes may need to stay on the link scale, or use a multiplicative (odds ratio) explanation instead

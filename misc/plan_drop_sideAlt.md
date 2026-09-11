@@ -1,6 +1,34 @@
 # Plan — drop `sideAlt_trial` from all models
 
-Status: **not started**. Written 2026-09-11.
+Status: **done** (2026-09-11), except the prose re-sync noted at the bottom.
+Steps 1-7 and the Methods edits in step 8 are complete.
+
+## Outcome of the sensitivity check (step 2)
+
+Every conclusion survived. Refitting all models with and without the term:
+
+| Result | With | Without | Verdict |
+|---|---|---|---|
+| perpPara trial x phase | p = 0.089 | p = 0.096 | still non-significant |
+| Canopy G test-end vs ctrl-start | p = 0.021 | p = 0.018 | still significant |
+| Eq. 3 perp/para vs thin oblique | p = 0.044 | p = 0.045 | still significant |
+| Eq. 4 artificial vs naturalistic | p < 0.001 | p < 0.001 | unchanged |
+| "three of the six" canopies above chance | E, G sig.; I borderline | same | unchanged |
+
+Two test-end CI lower bounds cross 50% by ~0.2 percentage points, in
+opposite directions: brightDiff 50.03% -> 49.87% and the Canopy G pilot
+49.96% -> 50.18%. Neither changes a stated claim — the brightDiff prose
+already hedges ("only borderline significantly higher than 50%") and both
+still display as 50% once rounded to whole percent; the Canopy G pilot is
+supplementary and carries no significance claim. The real lesson is that
+those two above-chance calls were never robust either way.
+
+The "nearly unidentifiable: very large eigenvalue" warning on Eq. 4 is
+**pre-existing** — it appears identically with and without the term.
+
+---
+
+Original plan follows.
 
 ## Rationale
 
@@ -157,6 +185,26 @@ raw term names (`sideAlt\_trialTRUE`, `rank\_trial`, ...), but `main.tex` does
 not `\input` it — the live supplementary comes from `results_supplementary.tex`,
 which `\input`s the generated `tables/*.tex`. That file is dead. Deleting it
 outright is the right move, but it is a separate cleanup, not part of this task.
+
+### OUTSTANDING — the prose re-sync
+
+`sections/results_body.tex` was deliberately **not** re-synced. It is generated
+from `5_results_report.qmd`, and the manuscript's current copy was synced from
+the *uncommitted* working-copy version of that file, which is ahead of what is
+committed on this branch. Re-syncing from this branch's render would have
+reverted that newer prose, so the file was left untouched — its inline numbers
+are still the pre-refit ones while the tables are post-refit.
+
+To finish, from the main checkout once this branch is merged:
+
+```
+writing/overleaf_manuscript/wasp_dorsal_snapshot_discrimination/scripts/render_figures.sh
+writing/overleaf_manuscript/wasp_dorsal_snapshot_discrimination/scripts/sync_results_prose.sh
+```
+
+That regenerates the prose from the working-copy qmd against the refitted
+models. Expect small shifts only: e.g. the brightness trial p-value
+0.356 -> 0.381, and the Eq. 3 odds ratio 2.512 -> 2.484 (p 0.044 -> 0.045).
 
 ### Numbers to re-check by eye after the refit
 
